@@ -291,15 +291,21 @@ export default function App() {
           return [field, extractedInfo[field] || clean(String(info[field] || ''))];
         })
       ) as ProductInfo);
-      if (payload.title && payload.description) {
+      const autoFeatures = Array.isArray(payload.features) ? payload.features.filter((x): x is string => typeof x === 'string' && x.trim().length > 3) : [];
+      const autoKeywords = Array.isArray(payload.keywords) ? payload.keywords.filter((x): x is string => typeof x === 'string' && x.trim().length > 1) : [];
+      const autoTitle = typeof payload.title === 'string' ? payload.title.trim() : '';
+      const autoDescription = typeof payload.description === 'string' ? payload.description.trim() : '';
+      if (autoTitle && autoDescription.length >= 20 && autoFeatures.length > 0 && autoKeywords.length > 0 && !/سما$/i.test(autoTitle)) {
         setResult({
-          title: payload.title, description: payload.description,
-          features: Array.isArray(payload.features) ? payload.features : [],
-          keywords: Array.isArray(payload.keywords) ? payload.keywords : [],
-          titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives : []
+          title: autoTitle, description: autoDescription,
+          features: autoFeatures,
+          keywords: autoKeywords,
+          titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string' && x.trim().length > 3 && !/سما$/i.test(x)) : []
         });
+      } else {
+        setResult(null);
       }
-      setNotice('اكتمل تحليل البيانات المؤكدة. الحقول الفارغة تعني أن المعلومة غير متوفرة ولم يتم تخمينها.');
+      setNotice('اكتمل تحليل البيانات الأساسية. يمكنك إنشاء المحتوى بعد مراجعة المواصفات.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'حدث خطأ أثناء تعبئة الحقول.');
       setNotice('');
@@ -339,13 +345,23 @@ export default function App() {
       if (!response.ok) throw new Error(payload?.error || `تعذّر التوليد (HTTP ${response.status}). تحقق من نشر خادم الذكاء الاصطناعي.`);
       if (!payload) throw new Error('وصل رد غير مفهوم من خادم الذكاء الاصطناعي.');
 
-      if (!payload.title || !payload.description) throw new Error('استجابة الذكاء الاصطناعي غير مكتملة.');
+      const responseTitle = typeof payload.title === 'string' ? payload.title.trim() : '';
+      const responseDescription = typeof payload.description === 'string' ? payload.description.trim() : '';
+      const responseFeatures = Array.isArray(payload.features) ? payload.features.filter((x): x is string => typeof x === 'string' && x.trim().length > 3).map(x => x.trim()) : [];
+      const responseKeywords = Array.isArray(payload.keywords) ? payload.keywords.filter((x): x is string => typeof x === 'string' && x.trim().length > 1).map(x => x.trim()) : [];
+      const responseAlternatives = Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string' && x.trim().length > 3 && !/سما$/i.test(x)).map(x => x.trim()) : [];
+      if (!responseTitle || responseTitle.length < clean(name).length || /سما$/i.test(responseTitle) || (clean(name) && !responseTitle.startsWith(clean(name)))) {
+        throw new Error('العنوان الذي أعاده الذكاء الاصطناعي غير مكتمل. لم نحفظ المسودة؛ أعد المحاولة.');
+      }
+      if (responseDescription.length < 20 || responseFeatures.length === 0 || responseKeywords.length === 0) {
+        throw new Error('وصلت استجابة ناقصة من الذكاء الاصطناعي (الوصف أو المميزات أو الكلمات المفتاحية). لم نحفظ المسودة.');
+      }
       const draft: Draft = {
-        title: payload.title,
-        description: payload.description,
-        features: Array.isArray(payload.features) ? payload.features : [],
-        keywords: Array.isArray(payload.keywords) ? payload.keywords : [],
-        titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives : []
+        title: responseTitle,
+        description: responseDescription,
+        features: responseFeatures,
+        keywords: responseKeywords,
+        titleAlternatives: responseAlternatives
       };
       setResult(draft);
       if (!clean(name)) setName(draft.title);
