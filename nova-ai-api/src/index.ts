@@ -73,8 +73,11 @@ export default {
       if (origin !== allowedOrigin) return new Response(null, { status: 403 });
       return new Response(null, { status: 204, headers: jsonHeaders });
     }
-    if (request.method !== "POST") return json({ error: "الخادم يعمل. أرسل طلب POST من تطبيق NovaStores." }, 405);
-    if (origin && origin !== allowedOrigin) return json({ error: "المصدر غير مسموح." }, 403);
+    // Public, read-only health check; does not invoke or expose the AI binding.
+    if (request.method === "GET") return json({ status: "ok", service: "NovaStores API" });
+    if (request.method !== "POST") return json({ error: "الطريقة غير مدعومة." }, 405);
+    // Browser requests must originate from the published NovaStores app.
+    if (origin !== allowedOrigin) return json({ error: "المصدر غير مسموح." }, 403);
     try {
       const body = await request.json() as { name?: string; details?: string; platform?: string; imageDataUrl?: string };
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 160) : "";
