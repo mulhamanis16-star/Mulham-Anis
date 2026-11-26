@@ -385,7 +385,7 @@ export default function App() {
     </header>
     <section className="hero">
       <div className="eyebrow"><Sparkles size={15}/> ذكاء اصطناعي يخدم تجارتك</div>
-      <h1>حوّل بيانات منتجاتك إلى<br/><em>محتوى يليق بمتجرك</em></h1>
+      <h1>حوّل بيانات منتجاتك إلى<br/><em>محتوى احترافي يرتقي بمتجرك</em></h1>
       <p>أدخل مواصفات المنتج مرة واحدة، ودع NovaStores يجهّز لك عنواناً ووصفاً ومميزات وكلمات مفتاحية لكل منصة.</p>
     </section>
     <section className="bulk-panel panel">
@@ -406,7 +406,7 @@ export default function App() {
       <article className="panel">
         <div className="heading"><Store/><h2>بيانات المنتج</h2></div>
         <label htmlFor="product-name">اسم المنتج <b>*</b></label>
-        <input id="product-name" value={name} maxLength={300} onChange={e => { const value = e.target.value; if (value.includes("|")) void autoFillFromOneLine(value); else setName(value); }} placeholder="الصق هنا: وسادة ديكور | المقاس 45×45 سم، حشوة 400 غرام"/>
+        <input id="product-name" value={name} maxLength={300} onChange={e => setName(e.target.value)} onPaste={e => { const value = e.clipboardData.getData("text").trim(); if (value.includes("|")) { e.preventDefault(); void autoFillFromOneLine(value); } }} placeholder="الصق هنا: وسادة ديكور | المقاس 45×45 سم، حشوة 400 غرام"/>
         <div className="field-meta"><span>اسم واضح ومحدد يساعد على إنتاج عنوان أفضل.</span><span>{name.length}/120</span></div>
         <label htmlFor="product-details">المواصفات والتفاصيل</label>
         <textarea id="product-details" rows={6} value={details} maxLength={1200} onChange={e => setDetails(e.target.value)} placeholder={'اكتب كل مواصفة في سطر أو افصل بينها بفاصلة:\nالمقاس 160×200 سم\nغطاء قطني\nالسماكة 5 سم\nاللون أبيض'}/>
