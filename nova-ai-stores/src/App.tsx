@@ -22,6 +22,7 @@ const productInfoFields: { key: keyof ProductInfo; label: string; placeholder: s
 ];
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
 const AI_ENDPOINT_KEY = 'nova-ai-stores:ai-endpoint:v1';
+const DEFAULT_AI_ENDPOINT = 'https://bold-bush-b254.mulhamanis16.workers.dev/';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
 const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -106,7 +107,7 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
-  const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || '');
+  const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT);
   const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState('');
   const [bulkInput, setBulkInput] = useState('');
@@ -347,13 +348,13 @@ export default function App() {
         {error && <p className="error" role="alert">{error}</p>}
         <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>\n        <div className="ai-connection">
           <strong>ربط محرك الذكاء الاصطناعي</strong>
-          <input aria-label="رابط Cloudflare Worker" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)} placeholder="ألصق رابط Worker بعد نشره على Cloudflare" />
-          <small>يُحفظ الرابط في هذا المتصفح فقط. لا تضع أي مفتاح سري هنا.</small>
+          <input aria-label="رابط Cloudflare Worker" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)} placeholder="رابط خادم الذكاء الاصطناعي" />
+          <small>تم تجهيز رابط خادم Nova تلقائياً. يمكنك تغييره عند الحاجة؛ لا تضع أي مفتاح سري هنا.</small>
           <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={17}/>{aiBusy ? 'جارٍ التوليد بالذكاء الاصطناعي...' : 'إنشاء محتوى بالذكاء الاصطناعي'}</button>
         </div>
 
         <button className="reset" type="button" onClick={reset}><RotateCcw size={14}/> مسح البيانات</button>
-        <p className="hint">هذه نسخة تجريبية تولّد المسودة محلياً بقواعد نصية. لم يتم ربط خدمة ذكاء اصطناعي خارجية بعد.</p>
+        <p className="hint">يمكنك إنشاء مسودة محلية بسرعة، أو استخدام زر الذكاء الاصطناعي لإنتاج عنوان ووصف ومميزات وكلمات مفتاحية اعتماداً على بيانات المنتج. راجع المحتوى قبل النشر.</p>
       </article>
       <article className="panel output">
         <div className="heading"><Sparkles/><h2>محتوى المنتج</h2></div>
@@ -364,7 +365,7 @@ export default function App() {
           </section>
           <section><small>الوصف</small><textarea className="edit-field" aria-label="تعديل وصف المنتج" rows={5} value={result.description} onChange={e => setResult(prev => prev ? { ...prev, description: e.target.value } : prev)} /></section>
           <section><small>المميزات</small><textarea className="edit-field" aria-label="تعديل مميزات المنتج، كل ميزة في سطر" rows={4} value={result.features.join("\n")} onChange={e => setResult(prev => prev ? { ...prev, features: e.target.value.split("\n").map(x => x.trim()).filter(Boolean) } : prev)} /></section>
-          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /><small className="suggestion-note">اقتراحات أولية من بيانات المنتج؛ ليست أحجام بحث فعلية أو ترتيباً مضموناً. عند ربط محرك AI يمكن طلب صياغة أكثر ذكاءً.</small></section>
+          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /><small className="suggestion-note">اقتراحات أولية من بيانات المنتج؛ ليست أحجام بحث فعلية أو ترتيباً مضموناً.</small></section>
           <p className="review-note">راجع العنوان والوصف والكلمات المفتاحية قبل نشرها، وتأكد من توافقها مع سياسات منصة البيع.</p>
         </>}
         {notice && <p className="notice" role="status">{notice}</p>}
