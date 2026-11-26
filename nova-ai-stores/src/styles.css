@@ -344,3 +344,19 @@ footer{color:#8d9992}
   .panel:hover{box-shadow:0 21px 54px rgba(24,52,44,.075),0 2px 8px rgba(24,52,44,.03)}
   button{transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease}
 }
+
+
+/* Product image input and preview */
+.image-upload-section{margin:0 0 22px;padding:16px;border:1px solid #e1e9e2;border-radius:15px;background:linear-gradient(145deg,#fbfdfb,#f5f8f5)}
+.image-upload-heading{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.image-upload-heading strong{font-size:13px;color:var(--ns-ink)}
+.image-upload-heading span{font-size:10px;line-height:1.8;color:var(--ns-muted)}
+.image-dropzone{display:flex!important;align-items:center;justify-content:center;min-height:160px;margin:0!important;border:1.5px dashed #a9c6b8;border-radius:12px;background:#fff;cursor:pointer;overflow:hidden;transition:border-color .2s,background .2s}
+.image-dropzone:hover{border-color:var(--ns-jade);background:#f8fcf9}
+.image-dropzone img{display:block;width:100%;max-height:280px;object-fit:contain;background:#f7f9f7}
+.image-placeholder{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px;color:var(--ns-jade)}
+.image-placeholder b{font-size:12px}
+.image-placeholder small{font-size:10px;color:#899690}
+.image-file-input{display:none!important}
+.remove-image{display:flex;align-items:center;gap:5px;margin:9px 0 0 auto;padding:6px 9px;border:1px solid #eadfdb;border-radius:8px;background:#fff;color:#a65e55;font:inherit;font-size:10px;cursor:pointer}
+@media(max-width:520px){.image-upload-section{padding:12px}.image-dropzone{min-height:130px}}
