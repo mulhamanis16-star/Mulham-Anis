@@ -74,7 +74,7 @@ export default {
       return new Response(null, { status: 204, headers: jsonHeaders });
     }
     if (request.method !== "POST") return json({ error: "الخادم يعمل. أرسل طلب POST من تطبيق NovaStores." }, 405);
-    if (origin !== allowedOrigin) return json({ error: "المصدر غير مسموح." }, 403);
+    if (origin && origin !== allowedOrigin) return json({ error: "المصدر غير مسموح." }, 403);
     try {
       const body = await request.json() as { name?: string; details?: string; platform?: string; imageDataUrl?: string };
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 160) : "";
