@@ -143,8 +143,8 @@ export default {
         parsed = parseModelJson(extractModelText(normalized));
       }
       if (!parsed) return json({ error: "وصل رد من محرك الذكاء الاصطناعي، لكن تعذّر تحويله إلى حقول المنتج. جرّب مجدداً أو أضف مواصفات أوضح." }, 502);
-      const title = (typeof parsed.title === "string" ? parsed.title.trim() : "") || name;
-      const resolvedName = name || title;
+      const modelTitle = typeof parsed.title === "string" ? parsed.title.trim() : "";
+      const resolvedName = name || modelTitle;
       const suppliedDescription = typeof parsed.description === "string" ? parsed.description.trim() : "";
       const description = (suppliedDescription || (details ? "منتج " + resolvedName + " بالمواصفات التالية: " + details + ". يرجى مراجعة المقاس والتفاصيل قبل الشراء." : "منتج " + resolvedName + ". يرجى مراجعة تفاصيل المنتج والخيارات المتاحة قبل الشراء.")).slice(0, 4000);
       const suppliedFeatures = Array.isArray(parsed.features)
@@ -153,12 +153,22 @@ export default {
           .filter(x => x.length > 3 && !/^(اسم المنتج|استخدام|عنوان المنتج|مناسب|جودة عالية)\s*[:：-]?$/i.test(x) && !x.includes("اسم المنتج:"))
         : [];
       const detailFacts = details.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
-      const uniqueFeatures = (items: string[]) => [...new Map(items.map(item => [item.toLocaleLowerCase("ar").replace(/\s+/g, " "), item])).values()];
-      let features = uniqueFeatures(suppliedFeatures).slice(0, 5);
-      if (features.length < 4) features = uniqueFeatures([...features, ...detailFacts]).slice(0, 5);
-      if (!features.length) features = detailFacts.slice(0, 4);
-      const keywords = (Array.isArray(parsed.keywords) ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 15);
-      const titleAlternatives = (Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 5);
+      const unique = (items: string[]) => [...new Map(items.map(item => [item.toLocaleLowerCase("ar").replace(/\s+/g, " "), item])).values()];
+      let features = unique(suppliedFeatures).slice(0, 5);
+      if (features.length < 4) features = unique([...features, ...detailFacts]).slice(0, 5);
+      if (!features.length && detailFacts.length) features = detailFacts.slice(0, 4);
+      const keywordCandidates = Array.isArray(parsed.keywords)
+        ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+        : [];
+      const keywords = unique([...keywordCandidates, name, ...detailFacts]).filter(x => x.length > 1).slice(0, 15);
+      const dimensionsMatch = details.match(/\d{1,4}(?:[.,]\d+)?\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?(?:\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?)?\s*(?:سم|cm)?/i);
+      const dimensions = dimensionsMatch?.[0]?.trim() || "";
+      const validModelTitle = modelTitle.length >= resolvedName.length && (!name || modelTitle.startsWith(name)) && !/\bسما$/.test(modelTitle);
+      const title = validModelTitle ? modelTitle : [resolvedName, dimensions].filter(Boolean).join(" - ");
+      const alternativesFromModel = Array.isArray(parsed.titleAlternatives)
+        ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+        : [];
+      const titleAlternatives = unique([...alternativesFromModel, dimensions ? resolvedName + " بمقاس " + dimensions : resolvedName + " للاستخدام اليومي"]).filter(x => x !== title).slice(0, 5);
       const info = parsed.productInfo && typeof parsed.productInfo === "object" ? parsed.productInfo as Record<string, unknown> : {};
       const productInfo = Object.fromEntries(["category", "brand", "material", "dimensions", "color", "audience", "usage", "packageContents", "care", "warranty", "origin"].map(key => [key, typeof info[key] === "string" ? (info[key] as string).trim().slice(0, 300) : ""]));
       return json({ title: title.slice(0, 220), description, features, keywords, titleAlternatives, productInfo });
