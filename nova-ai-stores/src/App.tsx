@@ -26,6 +26,43 @@ const DEFAULT_AI_ENDPOINT = 'https://bold-bush-b254.mulhamanis16.workers.dev/';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
 const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
+function extractKnownProductInfo(name: string, details: string): ProductInfo {
+  const text = `${name}\n${details}`;
+  const info: ProductInfo = { ...emptyProductInfo };
+  const set = (key: keyof ProductInfo, value: string) => { if (value && !info[key]) info[key] = clean(value); };
+  const dimension = text.match(/(?:المقاس|الأبعاد|حجم)?\s*(\d{1,4}(?:[.,]\d+)?\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?(?:\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?)?\s*(?:سم|cm)?)/i);
+  if (dimension) set('dimensions', dimension[1]);
+  const weight = text.match(/(?:الوزن|حشوة)\s*[:：]?\s*(\d+(?:[.,]\d+)?\s*(?:غرام|جرام|غ|كغ|كيلو))/i);
+  if (weight) set('dimensions', [info.dimensions, weight[1]].filter(Boolean).join('، '));
+  const color = text.match(/(?:اللون|بلون)\s*[:：]?\s*(أبيض|بيضاء|أسود|سوداء|رمادي|رمادية|بيج|بني|بنية|زهري|وردي|أزرق|أخضر|أحمر|كحلي)/i);
+  if (color) set('color', color[1]);
+  else {
+    const knownColor = text.match(/\b(أبيض|بيضاء|أسود|سوداء|رمادي|رمادية|بيج|بني|بنية|زهري|وردي|أزرق|أخضر|أحمر|كحلي)\b/);
+    if (knownColor) set('color', knownColor[1]);
+  }
+  const materials = ['قطن','ميكروفايبر','بوليستر','خشب','معدن','ستانلس ستيل','سيليكون','جلد','مخمل'];
+  const material = materials.find(item => text.includes(item));
+  if (material) set('material', material);
+  const brand = name.match(/Kunzita\s*Home|كونزيتا\s*هوم|كونزايتا\s*هوم/i);
+  if (brand) set('brand', brand[0]);
+  if (/وسادة|مخدة|مخدّة/.test(name)) set('category', 'وسائد ومخدات');
+  else if (/لباد|مرتبة|توبّر|توبر/.test(name)) set('category', 'لباد ومراتب');
+  else if (/سجاد|سجادة/.test(name)) set('category', 'سجاد');
+  else if (/كشاف|مصباح|إضاءة/.test(name)) set('category', 'إضاءة');
+  if (/أطفال|طفل|طفلة/.test(name)) set('audience', 'للأطفال');
+  else if (/للقطط|قطط|قطة/.test(name)) set('audience', 'للقطط');
+  if (/مع\s+وجه\s+مخدة|وجه\s+مخدة\s+إضافي/.test(text)) set('packageContents', 'وسادة مع وجه مخدة إضافي');
+  else if (/\+/.test(text)) set('packageContents', text.split(/[،,؛;\n]+/).filter(x => x.includes('+')).join('، '));
+  if (/وسادة|مخدة|مخدّة/.test(name)) set('usage', 'للاستخدام كوسادة');
+  else if (/لباد|مرتبة/.test(name)) set('usage', 'للاستخدام فوق المرتبة');
+  if (/غسيل يدوي|غسل يدوي|30\s*درجة/.test(text)) set('care', (text.match(/[^،,؛;\n]*(?:غسيل|غسل)[^،,؛;\n]*/)?.[0] || '').trim());
+  const origin = text.match(/(?:بلد المنشأ|صنع في|صناعة)\s*[:：]?\s*([^،,؛;\n]+)/i);
+  if (origin) set('origin', origin[1]);
+  const warranty = text.match(/(?:الضمان)\s*[:：]?\s*([^،,؛;\n]+)/i);
+  if (warranty) set('warranty', warranty[1]);
+  return info;
+}
+
 const csvCell = (value: string) => '"' + value.replace(/"/g, '""') + '"';
 function parseCsvRows(text: string): string[][] {
   const rows: string[][] = [];
@@ -225,21 +262,13 @@ export default function App() {
       const payload = await response.json() as Draft & { error?: string; productInfo?: Partial<ProductInfo> };
       if (!response.ok) throw new Error(payload.error || 'تعذّر تحليل بيانات المنتج.');
       const info = payload.productInfo || {};
-      const dimensionMatch = specs.match(/(?:المقاس\s*)?\d+(?:\.\d+)?\s*[×xX]\s*\d+(?:\.\d+)?\s*(?:سم|cm)?/i);
-      const isPillow = /وسادة|مخدة|مخدّة/.test(productName);
-      setProductInfo({
-        category: clean(info.category || ''),
-        brand: clean(info.brand || ''),
-        material: clean(info.material || ''),
-        dimensions: clean(info.dimensions || '') || dimensionMatch?.[0] || '',
-        color: clean(info.color || ''),
-        audience: clean(info.audience || ''),
-        usage: clean(info.usage || ''),
-        packageContents: clean(info.packageContents || ''),
-        care: clean(info.care || ''),
-        warranty: clean(info.warranty || ''),
-        origin: clean(info.origin || '')
-      });
+      const extractedInfo = extractKnownProductInfo(productName, specs);
+      setProductInfo(Object.fromEntries(
+        Object.keys(emptyProductInfo).map(key => {
+          const field = key as keyof ProductInfo;
+          return [field, extractedInfo[field] || clean(String(info[field] || ''))];
+        })
+      ) as ProductInfo);
       if (payload.title && payload.description) {
         setResult({
           title: payload.title, description: payload.description,
@@ -298,7 +327,16 @@ export default function App() {
       };
       setResult(draft);
       if (!clean(name)) setName(draft.title);
-      if (payload.productInfo) setProductInfo(current => Object.fromEntries(Object.keys(emptyProductInfo).map(key => [key, clean(String(payload?.productInfo?.[key as keyof ProductInfo] || current[key as keyof ProductInfo]))])) as ProductInfo);
+      const extractedInfo = extractKnownProductInfo(clean(name), completeDetails);
+      const modelInfo = payload.productInfo || {};
+      setProductInfo(current => Object.fromEntries(
+        Object.keys(emptyProductInfo).map(key => {
+          const field = key as keyof ProductInfo;
+          const confirmed = extractedInfo[field];
+          const suggested = clean(String(modelInfo[field] || ''));
+          return [field, confirmed || suggested || current[field]];
+        })
+      ) as ProductInfo);
       setSavedDrafts(current => [{ id: `ai-${Date.now()}`, name: clean(name) || draft.title, details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
       setNotice('تم إنشاء محتوى بالذكاء الاصطناعي وحفظه محلياً. راجعه قبل النشر.');
     } catch (err) {
