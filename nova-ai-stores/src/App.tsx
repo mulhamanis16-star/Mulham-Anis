@@ -21,7 +21,7 @@ const productInfoFields: { key: keyof ProductInfo; label: string; placeholder: s
   { key: 'origin', label: 'بلد المنشأ', placeholder: 'بلد التصنيع إذا كان مؤكداً' },
 ];
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
-const AI_ENDPOINT_KEY = 'nova-ai-stores:ai-endpoint:v1';
+const AI_ENDPOINT_KEY = 'nova-ai-stores:ai-endpoint:v2';
 const DEFAULT_AI_ENDPOINT = 'https://bold-bush-b254.mulhamanis16.workers.dev/';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
@@ -107,7 +107,7 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
-  const [aiEndpoint, setAiEndpoint] = useState(() => { const saved = localStorage.getItem(AI_ENDPOINT_KEY); return saved && /^https:\\/\\//i.test(saved) ? saved : DEFAULT_AI_ENDPOINT; });
+  const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT);
   const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState('');
   const [bulkInput, setBulkInput] = useState('');
@@ -362,7 +362,8 @@ export default function App() {
         <label>منصة البيع</label>
         <div className="platforms">{platforms.map(p => <button type="button" key={p} aria-pressed={platform === p} className={platform === p ? 'active' : ''} onClick={() => { setPlatform(p); setResult(null); }}>{p}</button>)}</div>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>\n        <div className="ai-connection">
+        <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>
+        <div className="ai-connection">
           <strong>ربط محرك الذكاء الاصطناعي</strong>
           <input aria-label="رابط Cloudflare Worker" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)} placeholder="رابط خادم الذكاء الاصطناعي" />
           <small>تم تجهيز رابط خادم Nova تلقائياً. يمكنك تغييره عند الحاجة؛ لا تضع أي مفتاح سري هنا.</small>
