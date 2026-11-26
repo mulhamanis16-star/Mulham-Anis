@@ -198,7 +198,9 @@ export default function App() {
       { label: 'إدخال بلد المنشأ', done: !!clean(productInfo.origin) && clean(productInfo.origin) !== 'غير مذكور في البيانات', points: 5, tip: 'أدخل بلد المنشأ إذا كان مؤكداً.' },
       { label: 'توضيح الضمان', done: !!clean(productInfo.warranty) && clean(productInfo.warranty) !== 'غير مذكور في البيانات', points: 5, tip: 'أدخل تفاصيل الضمان أو اتركه فارغاً إذا لا يوجد.' },
     ];
-    const score = checks.reduce((total, item) => total + (item.done ? item.points : 0), 0);
+    const earnedPoints = checks.reduce((total, item) => total + (item.done ? item.points : 0), 0);
+    const maximumPoints = checks.reduce((total, item) => total + item.points, 0);
+    const score = maximumPoints ? Math.round((earnedPoints / maximumPoints) * 100) : 0;
     return { checks, score, missing: checks.filter(item => !item.done) };
   }, [name, details, productInfo]);
 
@@ -257,10 +259,14 @@ export default function App() {
     if (splitAt < 1) { setName(line); return; }
     const productName = clean(line.slice(0, splitAt));
     const specs = clean(line.slice(splitAt + 1));
+    // لا تسمح ببقاء صورة أو مواصفات يدوية من المنتج السابق عند لصق منتج جديد.
+    setProductImage('');
+    setProductInfo(emptyProductInfo);
     setName(productName);
     setDetails(specs);
     setResult(null);
     setError('');
+    setNotice('تم استبدال بيانات المنتج السابق. جارٍ تحليل المنتج الجديد فقط...');
     if (productName.length < 2) return;
     const endpoint = aiEndpoint.trim().replace(/\/$/, '');
     if (!endpoint || !/^https:\/\//i.test(endpoint)) {
