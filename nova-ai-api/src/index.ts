@@ -75,7 +75,7 @@ export default {
       const messages = [
         {
           role: "system",
-          content: "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية الفصحى التجارية الواضحة. التزم حصراً بالمعلومات التي يذكرها المستخدم؛ لا تخترع خامات أو ضمانات أو فوائد طبية أو شهادات أو بلد منشأ أو أرقاماً. إذا كانت البيانات ناقصة فلا تستنتجها. تجنب الحشو والتكرار والادعاءات المضمونة عن SEO. أخرج كائن JSON صالحاً فقط بالشكل: {\"title\": string, \"description\": string, \"features\": string[], \"keywords\": string[], \"titleAlternatives\": string[]}. اجعل العنوان مناسباً لمنصة البيع، والوصف مفيداً، من 4 إلى 6 مميزات مستندة للبيانات، و8 إلى 12 عبارة مفتاحية مرتبطة مباشرة بالمنتج، و3 عناوين بديلة. لا تضع Markdown أو أي نص خارج JSON."
+          content: "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية الفصحى التجارية الواضحة. التزم حصراً بالمعلومات التي يذكرها المستخدم؛ لا تخترع خامات أو ضمانات أو فوائد طبية أو شهادات أو بلد منشأ أو أرقاماً. إذا كانت البيانات ناقصة فلا تستنتجها. تجنب الحشو والتكرار والادعاءات المضمونة عن SEO. أخرج كائن JSON صالحاً فقط وبالمفاتيح التالية جميعها: {\"title\": string, \"description\": string, \"features\": string[], \"keywords\": string[], \"titleAlternatives\": string[], \"productInfo\": {\"category\": string, \"brand\": string, \"material\": string, \"dimensions\": string, \"color\": string, \"audience\": string, \"usage\": string, \"packageContents\": string, \"care\": string, \"warranty\": string, \"origin\": string}}. املأ كل حقل في productInfo بمعلومة مؤكدة من اسم المنتج أو المواصفات فقط، واكتب سلسلة فارغة إذا لم ترد المعلومة. لا تترك أي مفتاح محذوفاً. اجعل العنوان مناسباً لمنصة البيع، والوصف مفيداً، وfeatures من 4 إلى 6 عناصر قصيرة مستندة حصراً إلى البيانات. إذا كانت البيانات قليلة، استخدم حقائق الاسم والمواصفات دون اختراع. أعد 8 إلى 12 عبارة مفتاحية و3 عناوين بديلة. لا تضع Markdown أو أي نص خارج JSON."
         },
         {
           role: "user",
@@ -91,15 +91,18 @@ export default {
       });
       const parsed = parseModelJson(extractModelText(output));
       if (!parsed) return json({ error: "لم يرجع النموذج محتوى منظماً صالحاً. حاول مجدداً." }, 502);
-      const title = typeof parsed.title === "string" ? parsed.title.trim().slice(0, 220) : "";
-      const description = typeof parsed.description === "string" ? parsed.description.trim().slice(0, 4000) : "";
-      const features = Array.isArray(parsed.features) ? parsed.features.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 8) : [];
-      const keywords = Array.isArray(parsed.keywords) ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 15) : [];
-      const titleAlternatives = Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 5) : [];
+      const title = (typeof parsed.title === "string" ? parsed.title.trim() : "") || name;
+      const suppliedDescription = typeof parsed.description === "string" ? parsed.description.trim() : "";
+      const description = (suppliedDescription || (details ? "منتج " + name + " بالمواصفات التالية: " + details + ". يرجى مراجعة المقاس والتفاصيل قبل الشراء." : "منتج " + name + ". يرجى مراجعة تفاصيل المنتج والخيارات المتاحة قبل الشراء.")).slice(0, 4000);
+      const suppliedFeatures = Array.isArray(parsed.features) ? parsed.features.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map(x => x.trim()) : [];
+      const detailFacts = details.split(/[،,؛;\\n]+/).map(x => x.trim()).filter(Boolean);
+      const features = [...new Set([...suppliedFeatures, ...detailFacts, "اسم المنتج: " + name])].slice(0, 8);
+      while (features.length < 3) features.push(features.length === 1 ? "المواصفات الإضافية غير مذكورة في البيانات المقدمة" : "يرجى تأكيد تفاصيل المنتج قبل النشر");
+      const keywords = (Array.isArray(parsed.keywords) ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 15);
+      const titleAlternatives = (Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 5);
       const info = parsed.productInfo && typeof parsed.productInfo === "object" ? parsed.productInfo as Record<string, unknown> : {};
       const productInfo = Object.fromEntries(["category", "brand", "material", "dimensions", "color", "audience", "usage", "packageContents", "care", "warranty", "origin"].map(key => [key, typeof info[key] === "string" ? (info[key] as string).trim().slice(0, 300) : ""]));
-      if (!title || !description || features.length < 3) return json({ error: "كانت استجابة النموذج ناقصة. أعد المحاولة مع إضافة مواصفات أوضح." }, 502);
-      return json({ title, description, features, keywords, titleAlternatives, productInfo });
+      return json({ title: title.slice(0, 220), description, features, keywords, titleAlternatives, productInfo });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       return json({
