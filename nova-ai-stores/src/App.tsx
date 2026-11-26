@@ -248,7 +248,7 @@ export default function App() {
           titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives : []
         });
       }
-      setNotice('اكتمل الملء التلقائي للحقول المعروفة. الحقول المكتوب فيها «غير مذكور في البيانات» تحتاج تأكيداً منك، ولن تُحسب كمعلومات موثقة.');
+      setNotice('اكتمل تحليل البيانات المؤكدة. الحقول الفارغة تعني أن المعلومة غير متوفرة ولم يتم تخمينها.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'حدث خطأ أثناء تعبئة الحقول.');
       setNotice('');
