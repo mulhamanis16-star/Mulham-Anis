@@ -166,7 +166,7 @@ export default {
       const message = error instanceof Error ? error.message : "";
       const lowerMessage = message.toLowerCase();
       const userMessage = /license|licence|accept|agree|policy/.test(lowerMessage)
-        ? "لتفعيل تحليل الصور لأول مرة، افتح Cloudflare Workers AI ووافق على ترخيص Meta وسياسة الاستخدام لنموذج Llama 3.2 Vision، ثم أعد المحاولة."
+        ? "تعذّر تشغيل تحليل الصورة. تحقق من تفعيل نموذج Moondream 3.1 وشروط استخدامه وحصة Workers AI في Cloudflare، ثم أعد المحاولة."
         : message.includes("JSON")
           ? "تعذّر فهم استجابة النموذج. حاول مجدداً."
           : "تعذّر الاتصال بمحرك Workers AI. تحقق من ربط AI والحصة المتاحة في Cloudflare.";
