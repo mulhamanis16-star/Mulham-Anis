@@ -163,12 +163,12 @@ export default {
       const keywords = unique([...keywordCandidates, name, ...detailFacts]).filter(x => x.length > 1).slice(0, 15);
       const dimensionsMatch = details.match(/\d{1,4}(?:[.,]\d+)?\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?(?:\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?)?\s*(?:سم|cm)?/i);
       const dimensions = dimensionsMatch?.[0]?.trim() || "";
-      const validModelTitle = modelTitle.length >= resolvedName.length && (!name || modelTitle.startsWith(name)) && !/\bسما$/.test(modelTitle);
+      const validModelTitle = modelTitle.length >= resolvedName.length && (!name || modelTitle.startsWith(name)) && !/سما$/i.test(modelTitle);
       const title = validModelTitle ? modelTitle : [resolvedName, dimensions].filter(Boolean).join(" - ");
       const alternativesFromModel = Array.isArray(parsed.titleAlternatives)
         ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
         : [];
-      const titleAlternatives = unique([...alternativesFromModel.filter(x => !/سما$/.test(x)), dimensions ? resolvedName + " بمقاس " + dimensions : resolvedName + " للاستخدام اليومي"]).filter(x => x !== title).slice(0, 5);
+      const titleAlternatives = unique([...alternativesFromModel.filter(x => !/سما$/i.test(x) && x.startsWith(resolvedName) && x.length >= resolvedName.length), dimensions ? resolvedName + " بمقاس " + dimensions : resolvedName + " للاستخدام اليومي"]).filter(x => x !== title).slice(0, 5);
       const info = parsed.productInfo && typeof parsed.productInfo === "object" ? parsed.productInfo as Record<string, unknown> : {};
       const productInfo = Object.fromEntries(["category", "brand", "material", "dimensions", "color", "audience", "usage", "packageContents", "care", "warranty", "origin"].map(key => [key, typeof info[key] === "string" ? (info[key] as string).trim().slice(0, 300) : ""]));
       return json({ title: title.slice(0, 220), description, features, keywords, titleAlternatives, productInfo });
