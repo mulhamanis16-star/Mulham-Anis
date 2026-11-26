@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Download, FileSpreadsheet, Layers3, RotateCcw, Sparkles, Store, WandSparkles } from 'lucide-react';
+import { Copy, Download, FileSpreadsheet, ImagePlus, Layers3, RotateCcw, Sparkles, Store, WandSparkles, X } from 'lucide-react';
 
 type Platform = 'نون' | 'أمازون' | 'ترينديول' | 'زد' | 'سلة';
 type Draft = { title: string; description: string; features: string[]; keywords: string[]; titleAlternatives?: string[] };
@@ -103,6 +103,8 @@ function makeDraft(name: string, details: string, platform: Platform): Draft {
 export default function App() {
   const [name, setName] = useState('');
   const [details, setDetails] = useState('');
+  const [productImage, setProductImage] = useState('');
+  const [imageBusy, setImageBusy] = useState(false);
   const [productInfo, setProductInfo] = useState<ProductInfo>(emptyProductInfo);
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
@@ -165,6 +167,38 @@ export default function App() {
     setNotice('تم إنشاء المسودة وحفظها في سجل هذا الجهاز.');
   }
 
+  async function handleProductImage(file?: File) {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('ارفع صورة بصيغة JPG أو PNG أو WebP.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('حجم الصورة الأصلي يجب ألا يتجاوز 10 ميغابايت.');
+      return;
+    }
+    setImageBusy(true); setError('');
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxSide = 1280;
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('تعذّر تجهيز الصورة على هذا الجهاز.');
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      let dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      if (dataUrl.length > 4_500_000) dataUrl = canvas.toDataURL('image/jpeg', 0.68);
+      if (dataUrl.length > 4_500_000) throw new Error('الصورة ما زالت كبيرة. اختر صورة أصغر أو أقل دقة.');
+      setProductImage(dataUrl);
+      setNotice('تم إرفاق الصورة وتجهيزها للتحليل بالذكاء الاصطناعي.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذّر قراءة الصورة.');
+    } finally { setImageBusy(false); }
+  }
+
   async function autoFillFromOneLine(line: string) {
     const splitAt = line.indexOf('|');
     if (splitAt < 1) { setName(line); return; }
@@ -186,7 +220,7 @@ export default function App() {
       const response = await fetch(endpoint, {
         method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ name: productName, details: specs, platform })
+        body: JSON.stringify({ name: productName, details: specs, platform, imageDataUrl: productImage || undefined })
       });
       const payload = await response.json() as Draft & { error?: string; productInfo?: Partial<ProductInfo> };
       if (!response.ok) throw new Error(payload.error || 'تعذّر تحليل بيانات المنتج.');
@@ -228,7 +262,7 @@ export default function App() {
       setError('أدخل أولاً رابط خادم Cloudflare Worker المنشور في خانة إعداد الذكاء الاصطناعي.');
       return;
     }
-    if (clean(name).length < 2) { setError('اكتب اسم المنتج أولاً.'); return; }
+    if (clean(name).length < 2 && !productImage) { setError('اكتب اسم المنتج أو أرفق صورة للمنتج أولاً.'); return; }
     const completeDetails = [details, ...productInfoFields.map(field => productInfo[field.key] ? `${field.label}: ${clean(productInfo[field.key])}` : '')].filter(Boolean).join('\n');
     setAiBusy(true); setError(''); setNotice('جارٍ إرسال بيانات المنتج إلى محرك الذكاء الاصطناعي...');
     try {
@@ -243,14 +277,14 @@ export default function App() {
           credentials: 'omit',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ name: clean(name), details: completeDetails, platform }),
+          body: JSON.stringify({ name: clean(name), details: completeDetails, platform, imageDataUrl: productImage || undefined }),
           signal: controller.signal
         });
         responseText = await response.text();
       } finally {
         window.clearTimeout(timeoutId);
       }
-      let payload: (Draft & { error?: string }) | null = null;
+      let payload: (Draft & { error?: string; productInfo?: Partial<ProductInfo> }) | null = null;
       try { payload = JSON.parse(responseText) as Draft & { error?: string }; } catch { /* handled below */ }
       if (!response.ok) throw new Error(payload?.error || `تعذّر التوليد (HTTP ${response.status}). تحقق من نشر خادم الذكاء الاصطناعي.`);
       if (!payload) throw new Error('وصل رد غير مفهوم من خادم الذكاء الاصطناعي.');
@@ -264,7 +298,9 @@ export default function App() {
         titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives : []
       };
       setResult(draft);
-      setSavedDrafts(current => [{ id: `ai-${Date.now()}`, name: clean(name), details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
+      if (!clean(name)) setName(draft.title);
+      if (payload.productInfo) setProductInfo(current => Object.fromEntries(Object.keys(emptyProductInfo).map(key => [key, clean(String(payload?.productInfo?.[key as keyof ProductInfo] || current[key as keyof ProductInfo]))])) as ProductInfo);
+      setSavedDrafts(current => [{ id: `ai-${Date.now()}`, name: clean(name) || draft.title, details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
       setNotice('تم إنشاء محتوى بالذكاء الاصطناعي وحفظه محلياً. راجعه قبل النشر.');
     } catch (err) {
       setError(err instanceof DOMException && err.name === 'AbortError' ? 'استغرق التوليد أكثر من 90 ثانية. حاول مجدداً.' : err instanceof TypeError ? 'تعذّر الوصول إلى خادم الذكاء الاصطناعي. تحقق من الرابط وإعدادات الاتصال.' : err instanceof Error ? err.message : 'حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي.');
@@ -368,7 +404,7 @@ export default function App() {
     setNotice('تم تجهيز ملف CSV لفتحه في Excel.');
   }
 
-  function reset() { setName(''); setDetails(''); setProductInfo(emptyProductInfo); setResult(null); setError(''); setNotice(''); }
+  function reset() { setName(''); setDetails(''); setProductImage(''); setProductInfo(emptyProductInfo); setResult(null); setError(''); setNotice(''); }
 
   function openSaved(item: SavedDraft) {
     setName(item.name); setDetails(item.details); setPlatform(item.platform); setResult(item.result); setError(''); setNotice('تم فتح المسودة المحفوظة.');
@@ -405,7 +441,15 @@ export default function App() {
     <section className="workspace">
       <article className="panel">
         <div className="heading"><Store/><h2>بيانات المنتج</h2></div>
-        <label htmlFor="product-name">اسم المنتج <b>*</b></label>
+        <div className="image-upload-section">
+          <div className="image-upload-heading"><strong>صورة المنتج</strong><span>اختياري — ارفع صورة ليحلل الذكاء الاصطناعي شكل المنتج وتفاصيله الظاهرة</span></div>
+          <label className="image-dropzone" htmlFor="product-image">
+            {productImage ? <img src={productImage} alt="معاينة صورة المنتج" /> : <span className="image-placeholder"><ImagePlus size={25}/><b>{imageBusy ? 'جارٍ تجهيز الصورة...' : 'اضغط لرفع صورة المنتج'}</b><small>JPG أو PNG أو WebP · حتى 10 ميغابايت</small></span>}
+          </label>
+          <input id="product-image" className="image-file-input" type="file" accept="image/jpeg,image/png,image/webp" disabled={imageBusy} onChange={e => { void handleProductImage(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+          {productImage && <button type="button" className="remove-image" onClick={() => setProductImage('')}><X size={14}/> إزالة الصورة</button>}
+        </div>
+        <label htmlFor="product-name">اسم المنتج</label>
         <input id="product-name" value={name} maxLength={300} onChange={e => setName(e.target.value)} onPaste={e => { const value = e.clipboardData.getData("text").trim(); if (value.includes("|")) { e.preventDefault(); void autoFillFromOneLine(value); } }} placeholder="الصق هنا: وسادة ديكور | المقاس 45×45 سم، حشوة 400 غرام"/>
         <div className="field-meta"><span>اسم واضح ومحدد يساعد على إنتاج عنوان أفضل.</span><span>{name.length}/120</span></div>
         <label htmlFor="product-details">المواصفات والتفاصيل</label>
@@ -437,7 +481,7 @@ export default function App() {
         <div className="platforms">{platforms.map(p => <button type="button" key={p} aria-pressed={platform === p} className={platform === p ? 'active' : ''} onClick={() => { setPlatform(p); setResult(null); }}>{p}</button>)}</div>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="ai-connection">
-          <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={18}/>{aiBusy ? 'جارٍ إنشاء المحتوى...' : 'إنشاء المحتوى بالذكاء الاصطناعي'}</button>
+          <button type="button" className="generate ai-generate" disabled={aiBusy || imageBusy || (clean(name).length < 2 && !productImage)} onClick={() => void enhanceWithAI()}><Sparkles size={18}/>{aiBusy ? 'جارٍ إنشاء المحتوى...' : 'إنشاء المحتوى بالذكاء الاصطناعي'}</button>
         </div>
 
         <button className="reset" type="button" onClick={reset}><RotateCcw size={14}/> مسح البيانات</button>
@@ -445,7 +489,7 @@ export default function App() {
       </article>
       <article className="panel output">
         <div className="heading"><Sparkles/><h2>محتوى المنتج</h2></div>
-        {!result ? <div className="empty"><div className="spark"><Sparkles/></div><h3>المحتوى سيظهر هنا</h3><p>أدخل اسم المنتج ومواصفاته ثم أنشئ المسودة.</p><div className="tags"><span>عنوان</span><span>وصف</span><span>مميزات</span><span>كلمات مفتاحية</span></div></div> : <>
+        {!result ? <div className="empty"><div className="spark"><Sparkles/></div><h3>المحتوى سيظهر هنا</h3><p>أدخل اسم المنتج أو أرفق صورته ومواصفاته ثم أنشئ المسودة.</p><div className="tags"><span>عنوان</span><span>وصف</span><span>مميزات</span><span>كلمات مفتاحية</span></div></div> : <>
           <div className="outputbar"><span>مسودة المنتج · {platform}</span><div><button className="copy" onClick={copyAll}><Copy size={14}/> نسخ الكل</button><button className="copy export" onClick={exportCsv}><Download size={14}/> تصدير CSV</button></div></div>
           <section><small>عنوان المنتج</small><textarea className="edit-field title-edit" aria-label="تعديل عنوان المنتج" rows={2} value={result.title} onChange={e => setResult(prev => prev ? { ...prev, title: e.target.value } : prev)} />
             {!!result.titleAlternatives?.length && <div className="title-suggestions"><strong>عناوين بديلة مقترحة</strong><div>{result.titleAlternatives.map((title, index) => <button type="button" key={index} onClick={() => setResult(prev => prev ? { ...prev, title } : prev)}>{title} <span>استخدام</span></button>)}</div></div>}
