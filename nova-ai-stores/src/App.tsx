@@ -382,12 +382,11 @@ export default function App() {
   return <main className="shell">
     <header>
       <a className="brand" href="#" aria-label="Nova Stores"><span className="logo"><Layers3 /></span><span>Nova<span>Stores</span><small>مساعد المتاجر الذكي</small></span></a>
-      <div className="pill"><span className="status-dot" /> نسخة تجريبية MVP</div>
     </header>
     <section className="hero">
-      <div className="eyebrow"><Sparkles size={15}/> أدوات عملية للتجارة الإلكترونية</div>
-      <h1>جهّز محتوى منتجك<br/><em>بخطوات أبسط</em></h1>
-      <p>أدخل بيانات المنتج، اختر منصة البيع، واحصل على مسودة قابلة للتعديل والتصدير.</p>
+      <div className="eyebrow"><Sparkles size={15}/> ذكاء اصطناعي يخدم تجارتك</div>
+      <h1>حوّل بيانات منتجاتك إلى<br/><em>محتوى يليق بمتجرك</em></h1>
+      <p>أدخل مواصفات المنتج مرة واحدة، ودع NovaStores يجهّز لك عنواناً ووصفاً ومميزات وكلمات مفتاحية لكل منصة.</p>
     </section>
     <section className="bulk-panel panel">
       <div className="heading"><FileSpreadsheet/><h2>إعداد محتوى مجموعة منتجات</h2></div>
@@ -437,13 +436,12 @@ export default function App() {
         <label>منصة البيع</label>
         <div className="platforms">{platforms.map(p => <button type="button" key={p} aria-pressed={platform === p} className={platform === p ? 'active' : ''} onClick={() => { setPlatform(p); setResult(null); }}>{p}</button>)}</div>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>
         <div className="ai-connection">
-          <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={17}/>{aiBusy ? 'جارٍ التوليد بالذكاء الاصطناعي...' : 'إنشاء محتوى بالذكاء الاصطناعي'}</button>
+          <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={18}/>{aiBusy ? 'جارٍ إنشاء المحتوى...' : 'إنشاء المحتوى بالذكاء الاصطناعي'}</button>
         </div>
 
         <button className="reset" type="button" onClick={reset}><RotateCcw size={14}/> مسح البيانات</button>
-        <p className="hint">يمكنك إنشاء مسودة محلية بسرعة، أو استخدام زر الذكاء الاصطناعي لإنتاج عنوان ووصف ومميزات وكلمات مفتاحية اعتماداً على بيانات المنتج. راجع المحتوى قبل النشر.</p>
+        <p className="hint">أنشئ محتوى احترافياً متوافقاً مع منصة البيع، ثم راجعه وعدّله قبل النشر.</p>
       </article>
       <article className="panel output">
         <div className="heading"><Sparkles/><h2>محتوى المنتج</h2></div>
