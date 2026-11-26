@@ -5,6 +5,21 @@ type Platform = 'نون' | 'أمازون' | 'ترينديول' | 'زد' | 'سل�
 type Draft = { title: string; description: string; features: string[]; keywords: string[] };
 type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };
 type BulkResult = { name: string; details: string; result: Draft };
+type ProductInfo = { category: string; brand: string; material: string; dimensions: string; color: string; audience: string; usage: string; packageContents: string; care: string; warranty: string; origin: string };
+const emptyProductInfo: ProductInfo = { category: '', brand: '', material: '', dimensions: '', color: '', audience: '', usage: '', packageContents: '', care: '', warranty: '', origin: '' };
+const productInfoFields: { key: keyof ProductInfo; label: string; placeholder: string }[] = [
+  { key: 'category', label: 'تصنيف المنتج', placeholder: 'مثال: مفروشات، أدوات منزلية، إلكترونيات' },
+  { key: 'brand', label: 'العلامة التجارية', placeholder: 'اسم العلامة التجارية أو اتركه فارغاً' },
+  { key: 'material', label: 'الخامة والمواد', placeholder: 'مثال: قطن، ميكروفايبر، خشب' },
+  { key: 'dimensions', label: 'المقاس والأبعاد', placeholder: 'مثال: 160×200 سم، الوزن، السعة' },
+  { key: 'color', label: 'اللون أو النمط', placeholder: 'مثال: أبيض، رمادي، نقش هندسي' },
+  { key: 'audience', label: 'الفئة المستهدفة', placeholder: 'مثال: للبالغين، للأطفال، للقطط' },
+  { key: 'usage', label: 'الاستخدام والفائدة', placeholder: 'ما المشكلة التي يحلها المنتج؟' },
+  { key: 'packageContents', label: 'محتويات العبوة', placeholder: 'مثال: قطعة واحدة + غطاء إضافي' },
+  { key: 'care', label: 'العناية والتنظيف', placeholder: 'مثال: غسيل يدوي على 30 درجة' },
+  { key: 'warranty', label: 'الضمان', placeholder: 'مدة الضمان وشروطه إن وجدت' },
+  { key: 'origin', label: 'بلد المنشأ', placeholder: 'بلد التصنيع إذا كان مؤكداً' },
+];
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
@@ -54,6 +69,7 @@ function makeDraft(name: string, details: string, platform: Platform): Draft {
 export default function App() {
   const [name, setName] = useState('');
   const [details, setDetails] = useState('');
+  const [productInfo, setProductInfo] = useState<ProductInfo>(emptyProductInfo);
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
@@ -79,13 +95,14 @@ export default function App() {
 
   function generate() {
     const productName = clean(name);
+    const completeDetails = [details, ...productInfoFields.map(field => productInfo[field.key] ? `${field.label}: ${clean(productInfo[field.key])}` : '')].filter(Boolean).join('\n');
     if (productName.length < 2) { setError('اكتب اسم المنتج بشكل صحيح أولاً.'); setResult(null); return; }
-    if (details.length > 1200) { setError('اختصر المواصفات إلى 1200 حرف كحد أقصى.'); return; }
+    if (details.length > 1200) { setError('اختصر المواصفات الأساسية إلى 1200 حرف كحد أقصى.'); return; }
     setError('');
     setNotice('');
-    const draft = makeDraft(productName, details, platform);
+    const draft = makeDraft(productName, completeDetails, platform);
     setResult(draft);
-    setSavedDrafts(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: productName, details, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
+    setSavedDrafts(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: productName, details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
     setNotice('تم إنشاء المسودة وحفظها في سجل هذا الجهاز.');
   }
 
@@ -134,7 +151,7 @@ export default function App() {
       ['اسم المنتج', 'المنصة', 'العنوان', 'الوصف', 'المميزات', 'الكلمات المفتاحية'],
       ...bulkResults.map(item => [item.name, platform, item.result.title, item.result.description, item.result.features.join(' | '), item.result.keywords.join('، ')])
     ];
-    const csv = '\\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\\r\\n');
+    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\\r\\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a'); link.href = url; link.download = 'nova-bulk-products.csv';
     document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
@@ -169,7 +186,7 @@ export default function App() {
     setNotice('تم تجهيز ملف CSV لفتحه في Excel.');
   }
 
-  function reset() { setName(''); setDetails(''); setResult(null); setError(''); setNotice(''); }
+  function reset() { setName(''); setDetails(''); setProductInfo(emptyProductInfo); setResult(null); setError(''); setNotice(''); }
 
   function openSaved(item: SavedDraft) {
     setName(item.name); setDetails(item.details); setPlatform(item.platform); setResult(item.result); setError(''); setNotice('تم فتح المسودة المحفوظة.');
@@ -213,6 +230,13 @@ export default function App() {
         <label htmlFor="product-details">المواصفات والتفاصيل</label>
         <textarea id="product-details" rows={6} value={details} maxLength={1200} onChange={e => setDetails(e.target.value)} placeholder={'اكتب كل مواصفة في سطر أو افصل بينها بفاصلة:\nالمقاس 160×200 سم\nغطاء قطني\nالسماكة 5 سم\nاللون أبيض'}/>
         <div className="field-meta"><span>اكتب معلومات مؤكدة فقط؛ لا تضف ادعاءات غير مثبتة.</span><span>{remaining}</span></div>
+        <div className="details-heading"><strong>تفاصيل إضافية ترفع جودة صفحة المنتج</strong><span>اختياري — عبّئ المتوفر فقط</span></div>
+        <div className="product-info-grid">
+          {productInfoFields.map(field => <div className="product-info-field" key={field.key}>
+            <label htmlFor={`info-${field.key}`}>{field.label}</label>
+            <input id={`info-${field.key}`} value={productInfo[field.key]} onChange={e => setProductInfo(current => ({ ...current, [field.key]: e.target.value }))} placeholder={field.placeholder} />
+          </div>)}
+        </div>
         <label>منصة البيع</label>
         <div className="platforms">{platforms.map(p => <button type="button" key={p} aria-pressed={platform === p} className={platform === p ? 'active' : ''} onClick={() => { setPlatform(p); setResult(null); }}>{p}</button>)}</div>
         {error && <p className="error" role="alert">{error}</p>}
