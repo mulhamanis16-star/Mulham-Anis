@@ -280,14 +280,9 @@ export default function App() {
       });
       const payload = await response.json() as Draft & { error?: string; productInfo?: Partial<ProductInfo> };
       if (!response.ok) throw new Error(payload.error || 'تعذّر تحليل بيانات المنتج.');
-      const info = payload.productInfo || {};
+      // لا نملأ حقول المواصفات بتخمينات النموذج؛ نستخدم ما استخرجه النص المؤكد فقط.
       const extractedInfo = extractKnownProductInfo(productName, specs);
-      setProductInfo(Object.fromEntries(
-        Object.keys(emptyProductInfo).map(key => {
-          const field = key as keyof ProductInfo;
-          return [field, extractedInfo[field] || clean(String(info[field] || ''))];
-        })
-      ) as ProductInfo);
+      setProductInfo(extractedInfo);
       const autoFeatures = Array.isArray(payload.features) ? payload.features.filter((x): x is string => typeof x === 'string' && x.trim().length > 3) : [];
       const autoKeywords = Array.isArray(payload.keywords) ? payload.keywords.filter((x): x is string => typeof x === 'string' && x.trim().length > 1) : [];
       const autoTitle = typeof payload.title === 'string' ? payload.title.trim() : '';
@@ -363,13 +358,11 @@ export default function App() {
       setResult(draft);
       if (!clean(name)) setName(draft.title);
       const extractedInfo = extractKnownProductInfo(clean(name), completeDetails);
-      const modelInfo = payload.productInfo || {};
+      // حافظ على إدخالات المستخدم، ولا تسمح لاقتراحات النموذج بتغيير حقائق المنتج أو مؤشر اكتمالها.
       setProductInfo(current => Object.fromEntries(
         Object.keys(emptyProductInfo).map(key => {
           const field = key as keyof ProductInfo;
-          const confirmed = extractedInfo[field];
-          const suggested = clean(String(modelInfo[field] || ''));
-          return [field, confirmed || suggested || current[field]];
+          return [field, extractedInfo[field] || current[field]];
         })
       ) as ProductInfo);
       setSavedDrafts(current => [{ id: `ai-${Date.now()}`, name: clean(name) || draft.title, details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
