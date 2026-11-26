@@ -149,11 +149,11 @@ export default {
       const description = (suppliedDescription || (details ? "منتج " + resolvedName + " بالمواصفات التالية: " + details + ". يرجى مراجعة المقاس والتفاصيل قبل الشراء." : "منتج " + resolvedName + ". يرجى مراجعة تفاصيل المنتج والخيارات المتاحة قبل الشراء.")).slice(0, 4000);
       const suppliedFeatures = Array.isArray(parsed.features)
         ? parsed.features.filter((x): x is string => typeof x === "string")
-          .map(x => x.replace(/^[-•*\\s]+/, "").trim())
-          .filter(x => x.length > 3 && !/^(اسم المنتج|استخدام|عنوان المنتج|مناسب|جودة عالية)\\s*[:：-]?$/i.test(x) && !x.includes("اسم المنتج:"))
+          .map(x => x.replace(/^[-•*\s]+/, "").trim())
+          .filter(x => x.length > 3 && !/^(اسم المنتج|استخدام|عنوان المنتج|مناسب|جودة عالية)\s*[:：-]?$/i.test(x) && !x.includes("اسم المنتج:"))
         : [];
-      const detailFacts = details.split(/[،,؛;\\n]+/).map(x => x.trim()).filter(Boolean);
-      const uniqueFeatures = (items: string[]) => [...new Map(items.map(item => [item.toLocaleLowerCase("ar").replace(/\\s+/g, " "), item])).values()];
+      const detailFacts = details.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
+      const uniqueFeatures = (items: string[]) => [...new Map(items.map(item => [item.toLocaleLowerCase("ar").replace(/\s+/g, " "), item])).values()];
       let features = uniqueFeatures(suppliedFeatures).slice(0, 5);
       if (features.length < 4) features = uniqueFeatures([...features, ...detailFacts]).slice(0, 5);
       if (!features.length) features = detailFacts.slice(0, 4);
