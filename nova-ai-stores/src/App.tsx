@@ -45,16 +45,16 @@ function extractKnownProductInfo(name: string, details: string): ProductInfo {
   if (material) set('material', material);
   const brand = name.match(/Kunzita\s*Home|كونزيتا\s*هوم|كونزايتا\s*هوم/i);
   if (brand) set('brand', brand[0]);
-  if (/وسادة|مخدة|مخدّة/.test(name)) set('category', 'وسائد ومخدات');
-  else if (/لباد|مرتبة|توبّر|توبر/.test(name)) set('category', 'لباد ومراتب');
-  else if (/سجاد|سجادة/.test(name)) set('category', 'سجاد');
-  else if (/كشاف|مصباح|إضاءة/.test(name)) set('category', 'إضاءة');
-  if (/أطفال|طفل|طفلة/.test(name)) set('audience', 'للأطفال');
-  else if (/للقطط|قطط|قطة/.test(name)) set('audience', 'للقطط');
-  if (/مع\s+وجه\s+مخدة|وجه\s+مخدة\s+إضافي/.test(text)) set('packageContents', 'وسادة مع وجه مخدة إضافي');
+  if (/وسادة|مخدة|مخدّة/.test(text)) set('category', 'وسائد ومخدات');
+  else if (/لباد|مرتبة|توبّر|توبر/.test(text)) set('category', 'لباد ومراتب');
+  else if (/سجاد|سجادة/.test(text)) set('category', 'سجاد');
+  else if (/كشاف|مصباح|إضاءة/.test(text)) set('category', 'إضاءة');
+  if (/أطفال|طفل|طفلة|رضع|رضيع/.test(text)) set('audience', 'للأطفال');
+  else if (/للقطط|قطط|قطة/.test(text)) set('audience', 'للقطط');
+  if (/وجه\s+مخد(?:ة|ه)\s+إضافي|مع\s+وجه\s+مخد(?:ة|ه)|غطاء\s+إضافي/.test(text)) set('packageContents', 'وسادة مع وجه مخدة إضافي');
   else if (/\+/.test(text)) set('packageContents', text.split(/[،,؛;\n]+/).filter(x => x.includes('+')).join('، '));
-  if (/وسادة|مخدة|مخدّة/.test(name)) set('usage', 'للاستخدام كوسادة');
-  else if (/لباد|مرتبة/.test(name)) set('usage', 'للاستخدام فوق المرتبة');
+  if (/وسادة|مخدة|مخدّة/.test(text)) set('usage', 'للاستخدام كوسادة');
+  else if (/لباد|مرتبة/.test(text)) set('usage', 'للاستخدام فوق المرتبة');
   if (/غسيل يدوي|غسل يدوي|30\s*درجة/.test(text)) set('care', (text.match(/[^،,؛;\n]*(?:غسيل|غسل)[^،,؛;\n]*/)?.[0] || '').trim());
   const origin = text.match(/(?:بلد المنشأ|صنع في|صناعة)\s*[:：]?\s*([^،,؛;\n]+)/i);
   if (origin) set('origin', origin[1]);
@@ -160,6 +160,22 @@ export default function App() {
   });
 
   useEffect(() => { localStorage.setItem(AI_ENDPOINT_KEY, aiEndpoint.trim()); }, [aiEndpoint]);
+
+  // استخرج الحقول المؤكدة فور كتابة الاسم أو المواصفات، دون انتظار استجابة الذكاء الاصطناعي.
+  useEffect(() => {
+    const extracted = extractKnownProductInfo(clean(name), clean(details));
+    setProductInfo(current => {
+      let changed = false;
+      const next = { ...current };
+      (Object.keys(emptyProductInfo) as (keyof ProductInfo)[]).forEach(field => {
+        if (!clean(next[field]) && clean(extracted[field])) {
+          next[field] = extracted[field];
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [name, details]);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDrafts)); }
