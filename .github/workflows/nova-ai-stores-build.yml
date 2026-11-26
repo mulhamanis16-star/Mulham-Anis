@@ -1,0 +1,26 @@
+name: Build Nova AI Stores
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nova-ai-stores/**'
+      - '.github/workflows/nova-ai-stores-build.yml'
+  pull_request:
+    paths:
+      - 'nova-ai-stores/**'
+      - '.github/workflows/nova-ai-stores-build.yml'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nova-ai-stores
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: nova-ai-stores/package-lock.json
+      - run: npm install
+      - run: npm run build
