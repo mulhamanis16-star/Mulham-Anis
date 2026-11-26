@@ -1,8 +1,9 @@
 export interface Env {
   AI: {
     run(model: string, input: {
-      messages: Array<{ role: string; content: string }>;
+      messages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }>;
       max_completion_tokens?: number;
+      max_tokens?: number;
       temperature?: number;
       response_format?: { type: "json_object" };
       chat_template_kwargs?: { enable_thinking?: boolean };
@@ -66,28 +67,25 @@ export default {
     if (request.method !== "POST") return json({ error: "الخادم يعمل. أرسل طلب POST من تطبيق NovaStores." }, 405);
     if (origin !== allowedOrigin) return json({ error: "المصدر غير مسموح." }, 403);
     try {
-      const body = await request.json() as { name?: string; details?: string; platform?: string };
+      const body = await request.json() as { name?: string; details?: string; platform?: string; imageDataUrl?: string };
       const name = typeof body.name === "string" ? body.name.trim().slice(0, 160) : "";
       const details = typeof body.details === "string" ? body.details.trim().slice(0, 5000) : "";
       const platform = typeof body.platform === "string" ? body.platform : "";
-      if (name.length < 2) return json({ error: "اسم المنتج غير كافٍ." }, 400);
+      const imageDataUrl = typeof body.imageDataUrl === "string" ? body.imageDataUrl : "";
+      const hasImage = imageDataUrl.length > 0;
+      if (hasImage && (!/^data:image\\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl) || imageDataUrl.length > 4_500_000)) return json({ error: "صيغة الصورة غير مدعومة أو حجمها أكبر من الحد المسموح." }, 400);
+      if (name.length < 2 && !hasImage) return json({ error: "اكتب اسم المنتج أو أرفق صورة واضحة له." }, 400);
       if (!["نون", "أمازون", "ترينديول", "زد", "سلة"].includes(platform)) return json({ error: "منصة البيع غير مدعومة." }, 400);
+      const systemPrompt = "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية الفصحى التجارية الواضحة. التزم حصراً بالمعلومات التي يذكرها المستخدم وبما يظهر بوضوح في الصورة إن وجدت. الصورة تثبت المظهر واللون والشكل والتفاصيل المرئية فقط؛ لا تستنتج منها الخامة أو المقاس أو الوزن أو بلد المنشأ أو الضمان أو محتويات العبوة أو الفوائد الطبية. لا تخترع أي مواصفة. إذا لم تتوفر معلومة فاكتب سلسلة فارغة في حقلها. أخرج كائن JSON صالحاً فقط وبالمفاتيح التالية جميعها: {\"title\": string, \"description\": string, \"features\": string[], \"keywords\": string[], \"titleAlternatives\": string[], \"productInfo\": {\"category\": string, \"brand\": string, \"material\": string, \"dimensions\": string, \"color\": string, \"audience\": string, \"usage\": string, \"packageContents\": string, \"care\": string, \"warranty\": string, \"origin\": string}}. املأ الحقول بمعلومات مؤكدة من النص أو تفاصيل ظاهرة بوضوح في الصورة فقط، واكتب سلسلة فارغة إذا لم ترد المعلومة. لا تترك أي مفتاح محذوفاً. اجعل العنوان مناسباً لمنصة البيع، والوصف مفيداً، وfeatures من 4 إلى 6 عناصر قصيرة واقعية. إذا لم يذكر اسم المنتج فاستخرج اسماً وصفياً عاماً من الصورة دون اختلاق علامة تجارية. أعد 8 إلى 12 عبارة مفتاحية و3 عناوين بديلة. لا تضع Markdown أو أي نص خارج JSON.";
+      const userText = "منصة البيع: " + platform + "\\nاسم المنتج: " + (name || "غير محدد؛ استخرج الاسم الوصفي من الصورة") + "\\nالمواصفات المؤكدة التي أدخلها المستخدم:\\n" + (details || "لم يذكر المستخدم مواصفات إضافية.") + (hasImage ? "\\nحلّل صورة المنتج المرفقة، واستخرج فقط الصفات المرئية بوضوح." : "") + "\\nاكتب محتوى جاهزاً للمراجعة والنشر وفق التعليمات.";
       const messages = [
-        {
-          role: "system",
-          content: "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية الفصحى التجارية الواضحة. التزم حصراً بالمعلومات التي يذكرها المستخدم؛ لا تخترع خامات أو ضمانات أو فوائد طبية أو شهادات أو بلد منشأ أو أرقاماً. إذا كانت البيانات ناقصة فلا تستنتجها. تجنب الحشو والتكرار والادعاءات المضمونة عن SEO. أخرج كائن JSON صالحاً فقط وبالمفاتيح التالية جميعها: {\"title\": string, \"description\": string, \"features\": string[], \"keywords\": string[], \"titleAlternatives\": string[], \"productInfo\": {\"category\": string, \"brand\": string, \"material\": string, \"dimensions\": string, \"color\": string, \"audience\": string, \"usage\": string, \"packageContents\": string, \"care\": string, \"warranty\": string, \"origin\": string}}. املأ كل حقل في productInfo بمعلومة مؤكدة من اسم المنتج أو المواصفات فقط، واكتب سلسلة فارغة إذا لم ترد المعلومة. لا تترك أي مفتاح محذوفاً. اجعل العنوان مناسباً لمنصة البيع، والوصف مفيداً، وfeatures من 4 إلى 6 عناصر قصيرة مستندة حصراً إلى البيانات. إذا كانت البيانات قليلة، استخدم حقائق الاسم والمواصفات دون اختراع. أعد 8 إلى 12 عبارة مفتاحية و3 عناوين بديلة. لا تضع Markdown أو أي نص خارج JSON."
-        },
-        {
-          role: "user",
-          content: "منصة البيع: " + platform + "\nاسم المنتج: " + name + "\nالمواصفات المؤكدة:\n" + (details || "لم يذكر المستخدم مواصفات إضافية.") + "\nاكتب محتوى جاهزاً للمراجعة والنشر وفق التعليمات."
-        }
+        { role: "system", content: systemPrompt },
+        { role: "user", content: hasImage ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: imageDataUrl } }] : userText }
       ];
-      const output = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+      const output = await env.AI.run(hasImage ? "@cf/meta/llama-3.2-11b-vision-instruct" : "@cf/zai-org/glm-4.7-flash", {
         messages,
-        max_completion_tokens: 1800,
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        chat_template_kwargs: { enable_thinking: false }
+        ...(hasImage ? { max_tokens: 1800 } : { max_completion_tokens: 1800, response_format: { type: "json_object" }, chat_template_kwargs: { enable_thinking: false } }),
+        temperature: 0.2
       });
       const parsed = parseModelJson(extractModelText(output));
       if (!parsed) return json({ error: "لم يرجع النموذج محتوى منظماً صالحاً. حاول مجدداً." }, 502);
