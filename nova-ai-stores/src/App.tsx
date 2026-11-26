@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Copy, Download, FileSpreadsheet, Layers3, RotateCcw, Sparkles, Store, WandSparkles } from 'lucide-react';
 
 type Platform = 'نون' | 'أمازون' | 'ترينديول' | 'زد' | 'سلة';
-type Draft = { title: string; description: string; features: string[]; keywords: string[] };
+type Draft = { title: string; description: string; features: string[]; keywords: string[]; titleAlternatives?: string[] };
 type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };
 type BulkResult = { name: string; details: string; result: Draft };
 type ProductInfo = { category: string; brand: string; material: string; dimensions: string; color: string; audience: string; usage: string; packageContents: string; care: string; warranty: string; origin: string };
@@ -45,10 +45,42 @@ function parseCsvRows(text: string): string[][] {
   return rows;
 }
 
+function keywordIdeas(name: string, details: string): string[] {
+  const stopWords = new Set(['متوفر', 'جديد', 'ممتاز', 'عالي الجودة', 'مناسب', 'عملي', 'أفضل', 'للبيع', 'المنتج']);
+  const source = [name, ...splitDetails(details).map(part => part.includes(':') ? part.slice(part.indexOf(':') + 1) : part)];
+  const candidates = source.flatMap(part => clean(part).split(/[|،,؛;\\n]+/));
+  const seen = new Set<string>();
+  return candidates.map(clean).filter(term => {
+    const normalized = term.toLocaleLowerCase('ar').replace(/[ـًٌٍَُِّْ]/g, '');
+    if (normalized.length < 2 || stopWords.has(normalized) || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  }).slice(0, 15);
+}
+
+function titleIdeas(name: string, details: string, platform: Platform): string[] {
+  const limit = platform === 'أمازون' ? 180 : platform === 'نون' ? 150 : 120;
+  const specs = splitDetails(details).map(part => part.includes(':') ? part.slice(part.indexOf(':') + 1) : part);
+  const candidates = [
+    name,
+    ...specs.slice(0, 4).map(spec => name + ' - ' + spec),
+    specs.length >= 2 ? name + ' - ' + specs.slice(0, 2).join('، ') : '',
+    specs.length >= 3 ? name + ' - ' + specs.slice(1, 3).join('، ') : '',
+  ];
+  const seen = new Set<string>();
+  return candidates.map(value => clean(value).slice(0, limit).trim()).filter(value => {
+    const key = value.toLocaleLowerCase('ar');
+    if (!value || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
+}
+
 function makeDraft(name: string, details: string, platform: Platform): Draft {
   const specs = splitDetails(details);
   const shortName = clean(name);
   const titleLimit = platform === 'أمازون' ? 180 : platform === 'نون' ? 150 : 120;
+  const titleAlternatives = titleIdeas(shortName, details, platform);
   const titleTail = specs.slice(0, 3).join(' | ');
   const title = (shortName + (titleTail ? ' - ' + titleTail : '')).slice(0, titleLimit).trim();
   const platformLead: Record<Platform, string> = {
@@ -238,7 +270,7 @@ export default function App() {
       </div>
       {bulkError && <p className="error" role="alert">{bulkError}</p>}
       {bulkResults.length > 0 && <div className="bulk-results"><strong>تم تجهيز {bulkResults.length} منتج</strong><div className="bulk-result-list">{bulkResults.slice(0, 5).map((item, i) => <div key={i}><span>{item.name}</span><small>{item.result.title}</small></div>)}</div>{bulkResults.length > 5 && <small>ويظهر باقي المحتوى في ملف CSV عند التصدير.</small>}</div>}
-      <p className="hint">المعالجة الحالية محلية بقواعد نصية تجريبية وليست ذكاءً اصطناعياً فعلياً. راجع البيانات قبل رفعها للمنصة.</p>
+      <p className="hint">الاقتراحات تُبنى محلياً من البيانات المدخلة وليست نتائج بحث فعلية أو ذكاءً اصطناعياً. راجعها قبل النشر.</p>
     </section>
     <section className="workspace">
       <article className="panel">
@@ -282,10 +314,12 @@ export default function App() {
         <div className="heading"><Sparkles/><h2>محتوى المنتج</h2></div>
         {!result ? <div className="empty"><div className="spark"><Sparkles/></div><h3>المحتوى سيظهر هنا</h3><p>أدخل اسم المنتج ومواصفاته ثم أنشئ المسودة.</p><div className="tags"><span>عنوان</span><span>وصف</span><span>مميزات</span><span>كلمات مفتاحية</span></div></div> : <>
           <div className="outputbar"><span>مسودة المنتج · {platform}</span><div><button className="copy" onClick={copyAll}><Copy size={14}/> نسخ الكل</button><button className="copy export" onClick={exportCsv}><Download size={14}/> تصدير CSV</button></div></div>
-          <section><small>عنوان المنتج</small><textarea className="edit-field title-edit" aria-label="تعديل عنوان المنتج" rows={2} value={result.title} onChange={e => setResult(prev => prev ? { ...prev, title: e.target.value } : prev)} /></section>
+          <section><small>عنوان المنتج</small><textarea className="edit-field title-edit" aria-label="تعديل عنوان المنتج" rows={2} value={result.title} onChange={e => setResult(prev => prev ? { ...prev, title: e.target.value } : prev)} />
+            {!!result.titleAlternatives?.length && <div className="title-suggestions"><strong>عناوين بديلة مقترحة</strong><div>{result.titleAlternatives.map((title, index) => <button type="button" key={index} onClick={() => setResult(prev => prev ? { ...prev, title } : prev)}>{title} <span>استخدام</span></button>)}</div></div>}
+          </section>
           <section><small>الوصف</small><textarea className="edit-field" aria-label="تعديل وصف المنتج" rows={5} value={result.description} onChange={e => setResult(prev => prev ? { ...prev, description: e.target.value } : prev)} /></section>
           <section><small>المميزات</small><textarea className="edit-field" aria-label="تعديل مميزات المنتج، كل ميزة في سطر" rows={4} value={result.features.join("\n")} onChange={e => setResult(prev => prev ? { ...prev, features: e.target.value.split("\n").map(x => x.trim()).filter(Boolean) } : prev)} /></section>
-          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /></section>
+          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /><small className="suggestion-note">اقتراحات مستخرجة من اسم المنتج ومواصفاته المدخلة، وليست أحجام بحث أو ترتيباً مؤكداً.</small></section>
           <p className="review-note">راجع العنوان والوصف والكلمات المفتاحية قبل نشرها، وتأكد من توافقها مع سياسات منصة البيع.</p>
         </>}
         {notice && <p className="notice" role="status">{notice}</p>}
