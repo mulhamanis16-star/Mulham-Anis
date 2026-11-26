@@ -3,7 +3,8 @@ import { Copy, Download, FileSpreadsheet, Layers3, RotateCcw, Sparkles, Store, W
 
 type Platform = 'نون' | 'أمازون' | 'ترينديول' | 'زد' | 'سلة';
 type Draft = { title: string; description: string; features: string[]; keywords: string[] };
-type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };\ntype BulkResult = { name: string; details: string; result: Draft };
+type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };
+type BulkResult = { name: string; details: string; result: Draft };
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
@@ -17,8 +18,8 @@ function parseCsvRows(text: string): string[][] {
     if (ch === '"' && quoted && text[i + 1] === '"') { cell += '"'; i++; }
     else if (ch === '"') quoted = !quoted;
     else if (ch === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
-    else if ((ch === '\\n' || ch === '\\r') && !quoted) {
-      if (ch === '\\r' && text[i + 1] === '\\n') i++;
+    else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
       row.push(cell.trim()); cell = '';
       if (row.some(x => x)) rows.push(row);
       row = [];
@@ -56,7 +57,10 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');\n  const [bulkInput, setBulkInput] = useState('');\n  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);\n  const [bulkError, setBulkError] = useState('');
+  const [error, setError] = useState('');
+  const [bulkInput, setBulkInput] = useState('');
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
+  const [bulkError, setBulkError] = useState('');
   const [savedDrafts, setSavedDrafts] = useState<SavedDraft[]>(() => {
     try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) as SavedDraft[] : []; }
     catch { return []; }
@@ -98,14 +102,14 @@ export default function App() {
         .filter(row => row.name.length >= 2);
       if (!data.length) { setBulkError('لم أجد أسماء منتجات. اجعل العمود الأول اسم المنتج والثاني المواصفات.'); return; }
       if (data.length > 100) { setBulkError('الحد الأقصى 100 منتج في الملف الواحد.'); return; }
-      setBulkInput(data.map(row => row.name + (row.details ? ' | ' + row.details : '')).join('\\n'));
+      setBulkInput(data.map(row => row.name + (row.details ? ' | ' + row.details : '')).join('\n'));
       setBulkError('');
       setNotice('تم استيراد ' + data.length + ' منتج من الملف. اضغط إنشاء المحتوى الدفعي.');
     } catch { setBulkError('تعذّر قراءة الملف. تأكد أنه CSV محفوظ بترميز UTF-8.'); }
   }
 
   function generateBulk() {
-    const rows = bulkInput.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+    const rows = bulkInput.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     if (!rows.length) { setBulkError('أضف منتجات أو استورد ملف CSV أولاً.'); return; }
     if (rows.length > 100) { setBulkError('الحد الأقصى 100 منتج في الدفعة الواحدة.'); return; }
     const parsed = rows.map(line => {
