@@ -108,7 +108,7 @@ export default function App() {
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
   const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT);
-  const [aiBusy, setAiBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);\n  const [autoFillBusy, setAutoFillBusy] = useState(false);
   const [error, setError] = useState('');
   const [bulkInput, setBulkInput] = useState('');
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
@@ -131,16 +131,16 @@ export default function App() {
       { label: 'اسم المنتج واضح ومحدد', done: clean(name).length >= 5, points: 10, tip: 'اكتب اسماً يوضح نوع المنتج واستخدامه.' },
       { label: 'إضافة مواصفات أساسية', done: clean(details).length >= 20, points: 10, tip: 'أضف المواصفات الأساسية مثل الخامة والمقاس والميزات.' },
       { label: 'تحديد تصنيف المنتج', done: !!clean(productInfo.category), points: 10, tip: 'حدد الفئة المناسبة لتسهيل فهم المنتج.' },
-      { label: 'إدخال العلامة التجارية', done: !!clean(productInfo.brand), points: 5, tip: 'أدخل العلامة التجارية إن كانت موجودة.' },
-      { label: 'توضيح الخامة والمواد', done: !!clean(productInfo.material), points: 10, tip: 'اذكر الخامة بدقة وتجنب التخمين.' },
+      { label: 'إدخال العلامة التجارية', done: !!clean(productInfo.brand) && clean(productInfo.brand) !== 'غير مذكور في البيانات', points: 5, tip: 'أدخل العلامة التجارية إن كانت موجودة.' },
+      { label: 'توضيح الخامة والمواد', done: !!clean(productInfo.material) && clean(productInfo.material) !== 'غير مذكور في البيانات', points: 10, tip: 'اذكر الخامة بدقة وتجنب التخمين.' },
       { label: 'إضافة المقاس أو الأبعاد', done: !!clean(productInfo.dimensions), points: 10, tip: 'أدخل المقاسات أو الوزن أو السعة حسب نوع المنتج.' },
-      { label: 'تحديد اللون أو النمط', done: !!clean(productInfo.color), points: 5, tip: 'حدد اللون أو النمط الفعلي للمنتج.' },
+      { label: 'تحديد اللون أو النمط', done: !!clean(productInfo.color) && clean(productInfo.color) !== 'غير مذكور في البيانات', points: 5, tip: 'حدد اللون أو النمط الفعلي للمنتج.' },
       { label: 'تحديد الفئة المستهدفة', done: !!clean(productInfo.audience), points: 5, tip: 'وضح لمن صُمم المنتج عند الحاجة.' },
       { label: 'شرح الاستخدام والفائدة', done: !!clean(productInfo.usage), points: 10, tip: 'اشرح الاستخدام والفائدة الواقعية للعميل.' },
-      { label: 'توضيح محتويات العبوة', done: !!clean(productInfo.packageContents), points: 5, tip: 'اذكر عدد القطع والملحقات المرفقة.' },
-      { label: 'إضافة تعليمات العناية', done: !!clean(productInfo.care), points: 5, tip: 'أضف طريقة التنظيف أو العناية إن توفرت.' },
-      { label: 'إدخال بلد المنشأ', done: !!clean(productInfo.origin), points: 5, tip: 'أدخل بلد المنشأ إذا كان مؤكداً.' },
-      { label: 'توضيح الضمان', done: !!clean(productInfo.warranty), points: 5, tip: 'أدخل تفاصيل الضمان أو اتركه فارغاً إذا لا يوجد.' },
+      { label: 'توضيح محتويات العبوة', done: !!clean(productInfo.packageContents) && clean(productInfo.packageContents) !== 'غير مذكور في البيانات', points: 5, tip: 'اذكر عدد القطع والملحقات المرفقة.' },
+      { label: 'إضافة تعليمات العناية', done: !!clean(productInfo.care) && clean(productInfo.care) !== 'غير مذكور في البيانات', points: 5, tip: 'أضف طريقة التنظيف أو العناية إن توفرت.' },
+      { label: 'إدخال بلد المنشأ', done: !!clean(productInfo.origin) && clean(productInfo.origin) !== 'غير مذكور في البيانات', points: 5, tip: 'أدخل بلد المنشأ إذا كان مؤكداً.' },
+      { label: 'توضيح الضمان', done: !!clean(productInfo.warranty) && clean(productInfo.warranty) !== 'غير مذكور في البيانات', points: 5, tip: 'أدخل تفاصيل الضمان أو اتركه فارغاً إذا لا يوجد.' },
     ];
     const score = checks.reduce((total, item) => total + (item.done ? item.points : 0), 0);
     return { checks, score, missing: checks.filter(item => !item.done) };
@@ -162,6 +162,61 @@ export default function App() {
     setResult(draft);
     setSavedDrafts(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: productName, details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
     setNotice('تم إنشاء المسودة وحفظها في سجل هذا الجهاز.');
+  }
+
+  async function autoFillFromOneLine(line: string) {
+    const splitAt = line.indexOf('|');
+    if (splitAt < 1) { setName(line); return; }
+    const productName = clean(line.slice(0, splitAt));
+    const specs = clean(line.slice(splitAt + 1));
+    setName(productName);
+    setDetails(specs);
+    setResult(null);
+    setError('');
+    if (productName.length < 2) return;
+    const endpoint = aiEndpoint.trim().replace(/\/$/, '');
+    if (!endpoint || !/^https:\/\//i.test(endpoint)) {
+      setError('تعذّر الملء التلقائي: تحقق من رابط محرك الذكاء الاصطناعي.');
+      return;
+    }
+    setAutoFillBusy(true);
+    setNotice('تم التقاط اسم المنتج ومواصفاته. جارٍ تعبئة الحقول تلقائياً...');
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ name: productName, details: specs, platform })
+      });
+      const payload = await response.json() as Draft & { error?: string; productInfo?: Partial<ProductInfo> };
+      if (!response.ok) throw new Error(payload.error || 'تعذّر تحليل بيانات المنتج.');
+      const info = payload.productInfo || {};
+      const unknown = 'غير مذكور في البيانات';
+      setProductInfo({
+        category: clean(info.category || '') || 'غير محدد تلقائياً',
+        brand: clean(info.brand || '') || unknown,
+        material: clean(info.material || '') || unknown,
+        dimensions: clean(info.dimensions || '') || (/(مقاس|مقاسات|سم|ملم|×|x)/i.test(specs) ? specs : unknown),
+        color: clean(info.color || '') || unknown,
+        audience: clean(info.audience || '') || 'للاستخدام المنزلي',
+        usage: clean(info.usage || '') || 'وسادة ديكور للاستخدام وتنسيق المفروشات المنزلية',
+        packageContents: clean(info.packageContents || '') || unknown,
+        care: clean(info.care || '') || unknown,
+        warranty: clean(info.warranty || '') || unknown,
+        origin: clean(info.origin || '') || unknown
+      });
+      if (payload.title && payload.description) {
+        setResult({
+          title: payload.title, description: payload.description,
+          features: Array.isArray(payload.features) ? payload.features : [],
+          keywords: Array.isArray(payload.keywords) ? payload.keywords : [],
+          titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives : []
+        });
+      }
+      setNotice('اكتمل الملء التلقائي للحقول المعروفة. الحقول المكتوب فيها «غير مذكور في البيانات» تحتاج تأكيداً منك، ولن تُحسب كمعلومات موثقة.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'حدث خطأ أثناء تعبئة الحقول.');
+      setNotice('');
+    } finally { setAutoFillBusy(false); }
   }
 
   async function enhanceWithAI() {
@@ -349,12 +404,12 @@ export default function App() {
       <article className="panel">
         <div className="heading"><Store/><h2>بيانات المنتج</h2></div>
         <label htmlFor="product-name">اسم المنتج <b>*</b></label>
-        <input id="product-name" value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="مثال: لباد سرير فندقي 5 سم"/>
+        <input id="product-name" value={name} maxLength={300} onChange={e => { const value = e.target.value; if (value.includes("|")) void autoFillFromOneLine(value); else setName(value); }} placeholder="الصق هنا: وسادة ديكور | المقاس 45×45 سم، حشوة 400 غرام"/>
         <div className="field-meta"><span>اسم واضح ومحدد يساعد على إنتاج عنوان أفضل.</span><span>{name.length}/120</span></div>
         <label htmlFor="product-details">المواصفات والتفاصيل</label>
         <textarea id="product-details" rows={6} value={details} maxLength={1200} onChange={e => setDetails(e.target.value)} placeholder={'اكتب كل مواصفة في سطر أو افصل بينها بفاصلة:\nالمقاس 160×200 سم\nغطاء قطني\nالسماكة 5 سم\nاللون أبيض'}/>
         <div className="field-meta"><span>اكتب معلومات مؤكدة فقط؛ لا تضف ادعاءات غير مثبتة.</span><span>{remaining}</span></div>
-        <div className="details-heading"><strong>تفاصيل إضافية ترفع جودة صفحة المنتج</strong><span>اختياري — عبّئ المتوفر فقط</span></div>
+        <div className="details-heading"><strong>تفاصيل إضافية ترفع جودة صفحة المنتج</strong><span>{autoFillBusy ? "جارٍ الملء التلقائي بالذكاء الاصطناعي..." : "تُملأ تلقائياً عند لصق الاسم والمواصفات"}</span></div>
         <div className="product-info-grid">
           {productInfoFields.map(field => <div className="product-info-field" key={field.key}>
             <label htmlFor={`info-${field.key}`}>{field.label}</label>
@@ -383,7 +438,7 @@ export default function App() {
         <div className="ai-connection">
           <strong>ربط محرك الذكاء الاصطناعي</strong>
           <input aria-label="رابط Cloudflare Worker" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)} placeholder="رابط خادم الذكاء الاصطناعي" />
-          <small>تم تجهيز رابط خادم Nova تلقائياً. يمكنك تغييره عند الحاجة؛ لا تضع أي مفتاح سري هنا.</small>
+          <small>عند لصق اسم المنتج متبوعاً بعلامة | والمواصفات في خانة الاسم، سيحلل الذكاء الاصطناعي البيانات ويملأ الحقول تلقائياً.</small>
           <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={17}/>{aiBusy ? 'جارٍ التوليد بالذكاء الاصطناعي...' : 'إنشاء محتوى بالذكاء الاصطناعي'}</button>
         </div>
 
