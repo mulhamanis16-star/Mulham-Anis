@@ -279,7 +279,7 @@ export default function App() {
       const response = await fetch(endpoint, {
         method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ name: productName, details: specs, platform, imageDataUrl: productImage || undefined })
+        body: JSON.stringify({ name: productName, details: specs, platform })
       });
       const payload = await response.json() as Draft & { error?: string; productInfo?: Partial<ProductInfo> };
       if (!response.ok) throw new Error(payload.error || 'تعذّر تحليل بيانات المنتج.');
