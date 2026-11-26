@@ -108,7 +108,8 @@ export default function App() {
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
   const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT);
-  const [aiBusy, setAiBusy] = useState(false);\n  const [autoFillBusy, setAutoFillBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [autoFillBusy, setAutoFillBusy] = useState(false);
   const [error, setError] = useState('');
   const [bulkInput, setBulkInput] = useState('');
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
