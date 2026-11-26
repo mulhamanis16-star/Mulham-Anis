@@ -242,7 +242,7 @@ export default function App() {
       ['اسم المنتج', 'المنصة', 'العنوان', 'الوصف', 'المميزات', 'الكلمات المفتاحية'],
       ...bulkResults.map(item => [item.name, platform, item.result.title, item.result.description, item.result.features.join(' | '), item.result.keywords.join('، ')])
     ];
-    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\\r\\n');
+    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a'); link.href = url; link.download = 'nova-bulk-products.csv';
     document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
@@ -301,7 +301,7 @@ export default function App() {
     <section className="bulk-panel panel">
       <div className="heading"><FileSpreadsheet/><h2>إعداد محتوى مجموعة منتجات</h2></div>
       <p className="bulk-help">أدخل كل منتج في سطر بهذا الشكل: اسم المنتج | المواصفات. أو استورد ملف CSV بعمود أول لاسم المنتج وعمود ثانٍ للمواصفات. حتى 100 منتج في الدفعة.</p>
-      <textarea className="bulk-input" rows={5} value={bulkInput} onChange={e => setBulkInput(e.target.value)} placeholder={'لباد سرير فندقي 5 سم | مقاس 160×200، غطاء قطني، لون أبيض\\nمخدة ديكور | مقاس 45×45، حشوة 400 غرام'} />
+      <textarea className="bulk-input" rows={5} value={bulkInput} onChange={e => setBulkInput(e.target.value)} placeholder={'لباد سرير فندقي 5 سم | مقاس 160×200، غطاء قطني، لون أبيض\nمخدة ديكور | مقاس 45×45، حشوة 400 غرام'} />
       <div className="bulk-actions">
         <label className="copy import-button" htmlFor="bulk-csv">استيراد ملف CSV</label>
         <input id="bulk-csv" type="file" accept=".csv,text/csv" hidden onChange={e => { void importBulkCsv(e.target.files?.[0]); e.currentTarget.value = ''; }} />
