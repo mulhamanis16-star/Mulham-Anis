@@ -439,9 +439,6 @@ export default function App() {
         {error && <p className="error" role="alert">{error}</p>}
         <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>
         <div className="ai-connection">
-          <strong>ربط محرك الذكاء الاصطناعي</strong>
-          <input aria-label="رابط Cloudflare Worker" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)} placeholder="رابط خادم الذكاء الاصطناعي" />
-          <small>عند لصق اسم المنتج متبوعاً بعلامة | والمواصفات في خانة الاسم، سيحلل الذكاء الاصطناعي البيانات ويملأ الحقول تلقائياً.</small>
           <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={17}/>{aiBusy ? 'جارٍ التوليد بالذكاء الاصطناعي...' : 'إنشاء محتوى بالذكاء الاصطناعي'}</button>
         </div>
 
