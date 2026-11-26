@@ -169,7 +169,7 @@ export default function App() {
       return;
     }
     if (clean(name).length < 2) { setError('اكتب اسم المنتج أولاً.'); return; }
-    const completeDetails = [details, ...productInfoFields.map(field => productInfo[field.key] ? `${field.label}: ${clean(productInfo[field.key])}` : '')].filter(Boolean).join('\\n');
+    const completeDetails = [details, ...productInfoFields.map(field => productInfo[field.key] ? `${field.label}: ${clean(productInfo[field.key])}` : '')].filter(Boolean).join('\n');
     setAiBusy(true); setError(''); setNotice('جارٍ إرسال بيانات المنتج إلى محرك الذكاء الاصطناعي...');
     try {
       const response = await fetch(endpoint, {
