@@ -1,6 +1,6 @@
 # Nova AI Stores API
 
-خادم منفصل وآمن لتوليد محتوى المنتجات باستخدام Cloudflare Workers AI.
+خادم منفصل لتوليد محتوى المنتجات باستخدام نموذج GLM-4.7-Flash متعدد اللغات على Cloudflare Workers AI.
 
 ## النشر الأولي
 1. أنشئ حساب Cloudflare وسجّل الدخول.
