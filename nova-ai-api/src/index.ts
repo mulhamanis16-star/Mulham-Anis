@@ -90,11 +90,12 @@ export default {
       const parsed = parseModelJson(extractModelText(output));
       if (!parsed) return json({ error: "لم يرجع النموذج محتوى منظماً صالحاً. حاول مجدداً." }, 502);
       const title = (typeof parsed.title === "string" ? parsed.title.trim() : "") || name;
+      const resolvedName = name || title;
       const suppliedDescription = typeof parsed.description === "string" ? parsed.description.trim() : "";
-      const description = (suppliedDescription || (details ? "منتج " + name + " بالمواصفات التالية: " + details + ". يرجى مراجعة المقاس والتفاصيل قبل الشراء." : "منتج " + name + ". يرجى مراجعة تفاصيل المنتج والخيارات المتاحة قبل الشراء.")).slice(0, 4000);
+      const description = (suppliedDescription || (details ? "منتج " + resolvedName + " بالمواصفات التالية: " + details + ". يرجى مراجعة المقاس والتفاصيل قبل الشراء." : "منتج " + resolvedName + ". يرجى مراجعة تفاصيل المنتج والخيارات المتاحة قبل الشراء.")).slice(0, 4000);
       const suppliedFeatures = Array.isArray(parsed.features) ? parsed.features.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map(x => x.trim()) : [];
       const detailFacts = details.split(/[،,؛;\\n]+/).map(x => x.trim()).filter(Boolean);
-      const features = [...new Set([...suppliedFeatures, ...detailFacts, "اسم المنتج: " + name])].slice(0, 8);
+      const features = [...new Set([...suppliedFeatures, ...detailFacts, "اسم المنتج: " + resolvedName])].slice(0, 8);
       while (features.length < 3) features.push(features.length === 1 ? "المواصفات الإضافية غير مذكورة في البيانات المقدمة" : "يرجى تأكيد تفاصيل المنتج قبل النشر");
       const keywords = (Array.isArray(parsed.keywords) ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 15);
       const titleAlternatives = (Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 5);
