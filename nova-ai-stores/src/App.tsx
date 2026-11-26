@@ -576,13 +576,14 @@ export default function App() {
       <article className="panel output">
         <div className="heading"><Sparkles/><h2>محتوى المنتج</h2></div>
         {!result ? <div className="empty"><div className="spark"><Sparkles/></div><h3>المحتوى سيظهر هنا</h3><p>أدخل اسم المنتج أو أرفق صورته ومواصفاته ثم أنشئ المسودة.</p><div className="tags"><span>عنوان</span><span>وصف</span><span>مميزات</span><span>كلمات مفتاحية</span></div></div> : <>
-          <div className="outputbar"><span>مسودة المنتج · {platform}</span><div><button className="copy" onClick={copyAll}><Copy size={14}/> نسخ الكل</button><button className="copy export" onClick={exportCsv}><Download size={14}/> تصدير CSV</button></div></div>
+          <div className="outputbar"><span>مسودة المنتج · {platform}</span><div><button className="copy" type="button" onClick={copyAll}><Copy size={14}/> نسخ المحتوى النهائي</button><button className="copy export" onClick={exportCsv}><Download size={14}/> تصدير CSV</button></div></div>
           <section><small>عنوان المنتج</small><textarea className="edit-field title-edit" aria-label="تعديل عنوان المنتج" rows={2} value={result.title} onChange={e => setResult(prev => prev ? { ...prev, title: e.target.value } : prev)} />
             {!!result.titleAlternatives?.length && <div className="title-suggestions"><strong>عناوين بديلة مقترحة</strong><div>{result.titleAlternatives.map((title, index) => <button type="button" key={index} onClick={() => setResult(prev => prev ? { ...prev, title } : prev)}>{title} <span>اعتماد العنوان</span></button>)}</div></div>}
           </section>
           <section><small>الوصف</small><textarea className="edit-field" aria-label="تعديل وصف المنتج" rows={5} value={result.description} onChange={e => setResult(prev => prev ? { ...prev, description: e.target.value } : prev)} /></section>
           <section><small>المميزات</small><textarea className="edit-field" aria-label="تعديل مميزات المنتج، كل ميزة في سطر" rows={4} value={result.features.join("\n")} onChange={e => setResult(prev => prev ? { ...prev, features: e.target.value.split("\n").map(x => x.trim()).filter(Boolean) } : prev)} /></section>
           <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /><small className="suggestion-note">اقتراحات أولية من بيانات المنتج؛ ليست أحجام بحث فعلية أو ترتيباً مضموناً.</small></section>
+          <section className="full-copy-section"><small>النص الكامل الجاهز للنسخ</small><textarea className="edit-field full-copy-text" aria-label="النص الكامل النهائي للنسخ" rows={12} readOnly value={fullText} onFocus={e => e.currentTarget.select()} /><small className="suggestion-note">يمكنك تحديد النص ونسخه يدوياً إذا تعذّر النسخ التلقائي.</small></section>
           <p className="review-note">راجع العنوان والوصف والكلمات المفتاحية قبل نشرها، وتأكد من توافقها مع سياسات منصة البيع.</p>
         </>}
         {notice && <p className="notice" role="status">{notice}</p>}
