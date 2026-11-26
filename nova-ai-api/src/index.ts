@@ -146,6 +146,7 @@ export default {
       const modelTitle = typeof parsed.title === "string" ? parsed.title.trim() : "";
       const resolvedName = name || modelTitle;
       const suppliedDescription = typeof parsed.description === "string" ? parsed.description.trim() : "";
+      const detailFacts = details.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
       const descriptionFacts = detailFacts.filter(x => !/^(?:اللون|الفئة المستهدفة|الضمان|بلد المنشأ)\s*[:：]/i.test(x)).slice(0, 5);
       const description = (suppliedDescription.length >= 70 ? suppliedDescription : [resolvedName + (descriptionFacts.length ? " بتفاصيل واضحة تلائم احتياجك اليومي." : "."), descriptionFacts.length ? "يأتي هذا المنتج بالمواصفات التالية: " + descriptionFacts.join("، ") + "." : "راجع تفاصيل المنتج والخيارات المتاحة قبل الشراء.", "تأكد من اختيار المقاس أو الخيار المناسب قبل إتمام الطلب."].join(" ")).slice(0, 4000);
       const suppliedFeatures = Array.isArray(parsed.features)
@@ -153,7 +154,6 @@ export default {
           .map(x => x.replace(/^[-•*\s]+/, "").trim())
           .filter(x => x.length > 3 && !/^(اسم المنتج|استخدام|عنوان المنتج|مناسب|جودة عالية)\s*[:：-]?$/i.test(x) && !x.includes("اسم المنتج:"))
         : [];
-      const detailFacts = details.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
       const unique = (items: string[]) => [...new Map(items.map(item => [item.toLocaleLowerCase("ar").replace(/\s+/g, " "), item])).values()];
       let features = unique(suppliedFeatures).slice(0, 5);
       if (features.length < 4) features = unique([...features, ...detailFacts]).slice(0, 5);
