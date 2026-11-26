@@ -107,7 +107,7 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
-  const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT);
+  const [aiEndpoint, setAiEndpoint] = useState(() => { const saved = localStorage.getItem(AI_ENDPOINT_KEY); return saved && /^https:\\/\\//i.test(saved) ? saved : DEFAULT_AI_ENDPOINT; });
   const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState('');
   const [bulkInput, setBulkInput] = useState('');
@@ -173,13 +173,29 @@ export default function App() {
     const completeDetails = [details, ...productInfoFields.map(field => productInfo[field.key] ? `${field.label}: ${clean(productInfo[field.key])}` : '')].filter(Boolean).join('\n');
     setAiBusy(true); setError(''); setNotice('جارٍ إرسال بيانات المنتج إلى محرك الذكاء الاصطناعي...');
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: clean(name), details: completeDetails, platform })
-      });
-      const payload = await response.json() as Draft & { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'تعذّر توليد المحتوى.');
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 90000);
+      let response: Response;
+      let responseText = '';
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ name: clean(name), details: completeDetails, platform }),
+          signal: controller.signal
+        });
+        responseText = await response.text();
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+      let payload: (Draft & { error?: string }) | null = null;
+      try { payload = JSON.parse(responseText) as Draft & { error?: string }; } catch { /* handled below */ }
+      if (!response.ok) throw new Error(payload?.error || `تعذّر التوليد (HTTP ${response.status}). تحقق من نشر خادم الذكاء الاصطناعي.`);
+      if (!payload) throw new Error('وصل رد غير مفهوم من خادم الذكاء الاصطناعي.');
+
       if (!payload.title || !payload.description) throw new Error('استجابة الذكاء الاصطناعي غير مكتملة.');
       const draft: Draft = {
         title: payload.title,
@@ -192,7 +208,7 @@ export default function App() {
       setSavedDrafts(current => [{ id: `ai-${Date.now()}`, name: clean(name), details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
       setNotice('تم إنشاء محتوى بالذكاء الاصطناعي وحفظه محلياً. راجعه قبل النشر.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي.');
+      setError(err instanceof DOMException && err.name === 'AbortError' ? 'استغرق التوليد أكثر من 90 ثانية. حاول مجدداً.' : err instanceof TypeError ? 'تعذّر الوصول إلى خادم الذكاء الاصطناعي. تحقق من الرابط وإعدادات الاتصال.' : err instanceof Error ? err.message : 'حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي.');
       setNotice('');
     } finally { setAiBusy(false); }
   }
