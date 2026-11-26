@@ -4,6 +4,9 @@ export interface Env {
       messages?: Array<{ role: string; content: string }>;
       image?: string;
       prompt?: string;
+      task?: string;
+      question?: string;
+      reasoning?: boolean;
       max_completion_tokens?: number;
       max_tokens?: number;
       temperature?: number;
@@ -28,10 +31,14 @@ function extractModelText(output: unknown): string {
   if (!output || typeof output !== "object") return "";
   const value = output as {
     response?: unknown;
+    answer?: unknown;
+    caption?: unknown;
     content?: unknown;
     choices?: Array<{ message?: { content?: unknown }; text?: unknown }>;
   };
   if (typeof value.response === "string") return value.response;
+  if (typeof value.answer === "string") return value.answer;
+  if (typeof value.caption === "string") return value.caption;
   if (typeof value.content === "string") return value.content;
   const choice = value.choices?.[0];
   if (typeof choice?.message?.content === "string") return choice.message.content;
@@ -78,19 +85,30 @@ export default {
       if (hasImage && (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl) || imageDataUrl.length > 4_500_000)) return json({ error: "صيغة الصورة غير مدعومة أو حجمها أكبر من الحد المسموح." }, 400);
       if (name.length < 2 && !hasImage) return json({ error: "اكتب اسم المنتج أو أرفق صورة واضحة له." }, 400);
       if (!["نون", "أمازون", "ترينديول", "زد", "سلة"].includes(platform)) return json({ error: "منصة البيع غير مدعومة." }, 400);
-      const systemPrompt = "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية الفصحى التجارية الواضحة. التزم حصراً بالمعلومات التي يذكرها المستخدم وبما يظهر بوضوح في الصورة إن وجدت. الصورة تثبت المظهر واللون والشكل والتفاصيل المرئية فقط؛ لا تستنتج منها الخامة أو المقاس أو الوزن أو بلد المنشأ أو الضمان أو محتويات العبوة أو الفوائد الطبية. لا تخترع أي مواصفة. إذا لم تتوفر معلومة فاكتب سلسلة فارغة في حقلها. أخرج كائن JSON صالحاً فقط وبالمفاتيح التالية جميعها: {\"title\": string, \"description\": string, \"features\": string[], \"keywords\": string[], \"titleAlternatives\": string[], \"productInfo\": {\"category\": string, \"brand\": string, \"material\": string, \"dimensions\": string, \"color\": string, \"audience\": string, \"usage\": string, \"packageContents\": string, \"care\": string, \"warranty\": string, \"origin\": string}}. املأ الحقول بمعلومات مؤكدة من النص أو تفاصيل ظاهرة بوضوح في الصورة فقط، واكتب سلسلة فارغة إذا لم ترد المعلومة. لا تترك أي مفتاح محذوفاً. اجعل العنوان مناسباً لمنصة البيع، والوصف مفيداً، وfeatures من 4 إلى 6 عناصر قصيرة واقعية. إذا لم يذكر اسم المنتج فاستخرج اسماً وصفياً عاماً من الصورة دون اختلاق علامة تجارية. أعد 8 إلى 12 عبارة مفتاحية و3 عناوين بديلة. لا تضع Markdown أو أي نص خارج JSON.";
-      const userText = "منصة البيع: " + platform + "\nاسم المنتج: " + (name || "غير محدد؛ استخرج الاسم الوصفي من الصورة") + "\nالمواصفات المؤكدة التي أدخلها المستخدم:\n" + (details || "لم يذكر المستخدم مواصفات إضافية.") + (hasImage ? "\nحلّل صورة المنتج المرفقة، واستخرج فقط الصفات المرئية بوضوح." : "") + "\nاكتب محتوى جاهزاً للمراجعة والنشر وفق التعليمات.";
-      const messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText }
-      ];
-      const model = hasImage ? "@cf/meta/llama-3.2-11b-vision-instruct" : "@cf/zai-org/glm-4.7-flash";
-      const modelInput = {
-        messages,
-        ...(hasImage ? { image: imageDataUrl, max_tokens: 1800 } : { max_completion_tokens: 1800, response_format: { type: "json_object" as const }, chat_template_kwargs: { enable_thinking: false } }),
+      const systemPrompt = "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية التجارية الواضحة. التزم فقط بالمعلومات المؤكدة في نص المستخدم والملاحظات المرئية المرفقة. لا تخمّن الخامة أو المقاس أو الوزن أو بلد المنشأ أو الضمان أو محتويات العبوة أو الفوائد الطبية. أخرج JSON صالحاً فقط بالمفاتيح: title, description, features, keywords, titleAlternatives, productInfo. features مصفوفة من 4 إلى 5 مميزات قصيرة، keywords من 6 إلى 8 عبارات، titleAlternatives عنوانان. productInfo كائن بمفاتيح category, brand, material, dimensions, color, audience, usage, packageContents, care, warranty, origin. كل القيم النصية المجهولة فارغة. لا تكتب Markdown أو شرحاً خارج JSON.";
+      let visualNotes = "";
+      if (hasImage) {
+        const visionOutput: unknown = await env.AI.run("@cf/moondream/moondream3.1-9B-A2B", {
+          task: "query",
+          image: imageDataUrl,
+          question: "صف باختصار نوع المنتج وشكله ولونه وتفاصيله الظاهرة بوضوح فقط. لا تستنتج الخامة أو المقاس أو الوزن أو العلامة التجارية.",
+          reasoning: false,
+          max_tokens: 180,
+          temperature: 0.1
+        });
+        visualNotes = extractModelText(visionOutput).slice(0, 1200);
+      }
+      const userText = "منصة البيع: " + platform + "\nاسم المنتج: " + (name || "غير محدد؛ اقترح اسماً وصفياً من الملاحظات المرئية") + "\nالمواصفات المؤكدة من المستخدم:\n" + (details || "لا توجد مواصفات إضافية.") + (visualNotes ? "\nملاحظات بصرية من الصورة (للمظهر فقط):\n" + visualNotes : "") + "\nأنشئ المحتوى النهائي وفق مخطط JSON.";
+      const output: unknown = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userText }
+        ],
+        max_completion_tokens: 1200,
+        response_format: { type: "json_object" },
+        chat_template_kwargs: { enable_thinking: false },
         temperature: 0.2
-      };
-      const output: unknown = await env.AI.run(model, modelInput);
+      });
       const rawModelText = extractModelText(output);
       let parsed = parseModelJson(rawModelText);
 
@@ -103,7 +121,7 @@ export default {
             { role: "system", content: formatterPrompt },
             { role: "user", content: "اسم المنتج: " + (name || "غير محدد") + "\nالمواصفات التي أدخلها المستخدم: " + (details || "غير مذكورة") + "\nمنصة البيع: " + platform + "\nالنص المراد تنظيمه:\n" + rawModelText.slice(0, 12000) }
           ],
-          max_completion_tokens: 1800,
+          max_completion_tokens: 1000,
           response_format: { type: "json_object" },
           chat_template_kwargs: { enable_thinking: false },
           temperature: 0.1
