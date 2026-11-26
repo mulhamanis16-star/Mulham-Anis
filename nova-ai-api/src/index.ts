@@ -46,7 +46,7 @@ export default {
         }
       ];
 
-      const output = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", { messages, max_tokens: 1200, temperature: 0.35 });
+      const output = await env.AI.run("@cf/zai-org/glm-4.7-flash", { messages, max_tokens: 1200, temperature: 0.35 });
       const raw = (output as { response?: unknown })?.response;
       if (typeof raw !== "string") return json({ error: "لم يرجع النموذج نصاً صالحاً. حاول مجدداً." }, 502);
       const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
