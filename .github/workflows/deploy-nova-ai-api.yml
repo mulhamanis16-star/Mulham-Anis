@@ -2,6 +2,10 @@ name: Deploy Nova AI Stores API
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'nova-ai-api/**'
+      - '.github/workflows/deploy-nova-ai-api.yml'
 
 permissions:
   contents: read
