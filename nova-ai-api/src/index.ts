@@ -84,8 +84,22 @@ export default {
       const hasImage = imageDataUrl.length > 0;
       if (hasImage && (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(imageDataUrl) || imageDataUrl.length > 4_500_000)) return json({ error: "صيغة الصورة غير مدعومة أو حجمها أكبر من الحد المسموح." }, 400);
       if (name.length < 2 && !hasImage) return json({ error: "اكتب اسم المنتج أو أرفق صورة واضحة له." }, 400);
+      // Reject obvious cross-product data contamination before sending anything to the model.
+      const productTypes = [
+        { type: "وسادة", pattern: /وسادة|مخدة|مخدّة|وسائد/ },
+        { type: "لباد سرير", pattern: /لباد|مرتبة|مفرش\s*مرتبة|توبّر|توبر/ },
+        { type: "سجاد", pattern: /سجاد|سجادة|دعاسة/ },
+        { type: "سرير أطفال", pattern: /سرير\s*أطفال|مهد|مهدّ/ },
+        { type: "إلكترونيات", pattern: /سماعة|سبيكر|شاحن|كشاف|مصباح|هاتف|جوال/ }
+      ];
+      const nameType = productTypes.find(item => item.pattern.test(name));
+      const detailTypes = productTypes.filter(item => item.pattern.test(details));
+      const conflictingType = detailTypes.find(item => nameType && item.type !== nameType.type);
+      if (nameType && conflictingType) {
+        return json({ error: "يبدو أن المواصفات لا تخص اسم المنتج الحالي. صحّح المواصفات أو امسحها ثم أعد إنشاء المحتوى؛ لم نرسل البيانات المتعارضة إلى الذكاء الاصطناعي." }, 400);
+      }
       if (!["نون", "أمازون", "ترينديول", "زد", "سلة"].includes(platform)) return json({ error: "منصة البيع غير مدعومة." }, 400);
-      const systemPrompt = "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية التجارية الواضحة. التزم فقط بالمعلومات المؤكدة في نص المستخدم والملاحظات المرئية المرفقة. لا تخمّن الخامة أو المقاس أو الوزن أو بلد المنشأ أو الضمان أو محتويات العبوة أو الفوائد الطبية. أخرج JSON صالحاً فقط بالمفاتيح: title, description, features, keywords, titleAlternatives, productInfo. features مصفوفة من 4 إلى 5 مميزات قصيرة، keywords من 6 إلى 8 عبارات، titleAlternatives عنوانان. productInfo كائن بمفاتيح category, brand, material, dimensions, color, audience, usage, packageContents, care, warranty, origin. كل القيم النصية المجهولة فارغة. لا تكتب Markdown أو شرحاً خارج JSON.";
+      const systemPrompt = "أنت خبير كتابة صفحات منتجات للتجارة الإلكترونية العربية. اكتب بالعربية التجارية الواضحة. اسم المنتج هو المرجع الأساسي لتحديد نوع المنتج، ولا تخلط بياناته بمنتج آخر. استخدم فقط المواصفات التي تخص نوع المنتج المذكور؛ إذا تعارضت معلومة مع نوع المنتج فتجاهلها ولا تنقلها إلى العنوان أو الوصف أو المميزات أو الكلمات المفتاحية. التزم فقط بالمعلومات المؤكدة في نص المستخدم والملاحظات المرئية. لا تخمّن الخامة أو المقاس أو الوزن أو بلد المنشأ أو الضمان أو محتويات العبوة أو الفوائد الطبية. اجعل العنوان واضحاً وقابلاً للنشر، والوصف مفيداً وغير مكرر. features من 4 إلى 5 مميزات فعلية قصيرة وليست إعادة لاسم المنتج أو عبارات عامة مثل اسم المنتج/استخدام/مناسب/جودة عالية. لا تضف مواصفة لمجرد ملء العدد؛ إذا لم تتوفر معلومات كافية استخدم ما هو مؤكد فقط. keywords من 6 إلى 8 عبارات مرتبطة بالمنتج فعلاً، وtitleAlternatives عنوانان بديلان صالحان للنشر دون كلمات مثل استخدام أو عنوان بديل. أخرج JSON صالحاً فقط بالمفاتيح: title, description, features, keywords, titleAlternatives, productInfo. productInfo كائن بمفاتيح category, brand, material, dimensions, color, audience, usage, packageContents, care, warranty, origin. كل القيم النصية المجهولة فارغة. لا تكتب Markdown أو شرحاً خارج JSON.";
       let visualNotes = "";
       if (hasImage) {
         const visionOutput: unknown = await env.AI.run("@cf/moondream/moondream3.1-9B-A2B", {
@@ -133,10 +147,16 @@ export default {
       const resolvedName = name || title;
       const suppliedDescription = typeof parsed.description === "string" ? parsed.description.trim() : "";
       const description = (suppliedDescription || (details ? "منتج " + resolvedName + " بالمواصفات التالية: " + details + ". يرجى مراجعة المقاس والتفاصيل قبل الشراء." : "منتج " + resolvedName + ". يرجى مراجعة تفاصيل المنتج والخيارات المتاحة قبل الشراء.")).slice(0, 4000);
-      const suppliedFeatures = Array.isArray(parsed.features) ? parsed.features.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map(x => x.trim()) : [];
-      const detailFacts = details.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
-      const features = [...new Set([...suppliedFeatures, ...detailFacts, "اسم المنتج: " + resolvedName])].slice(0, 8);
-      while (features.length < 3) features.push(features.length === 1 ? "المواصفات الإضافية غير مذكورة في البيانات المقدمة" : "يرجى تأكيد تفاصيل المنتج قبل النشر");
+      const suppliedFeatures = Array.isArray(parsed.features)
+        ? parsed.features.filter((x): x is string => typeof x === "string")
+          .map(x => x.replace(/^[-•*\\s]+/, "").trim())
+          .filter(x => x.length > 3 && !/^(اسم المنتج|استخدام|عنوان المنتج|مناسب|جودة عالية)\\s*[:：-]?$/i.test(x) && !x.includes("اسم المنتج:"))
+        : [];
+      const detailFacts = details.split(/[،,؛;\\n]+/).map(x => x.trim()).filter(Boolean);
+      const uniqueFeatures = (items: string[]) => [...new Map(items.map(item => [item.toLocaleLowerCase("ar").replace(/\\s+/g, " "), item])).values()];
+      let features = uniqueFeatures(suppliedFeatures).slice(0, 5);
+      if (features.length < 4) features = uniqueFeatures([...features, ...detailFacts]).slice(0, 5);
+      if (!features.length) features = detailFacts.slice(0, 4);
       const keywords = (Array.isArray(parsed.keywords) ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 15);
       const titleAlternatives = (Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : []).slice(0, 5);
       const info = parsed.productInfo && typeof parsed.productInfo === "object" ? parsed.productInfo as Record<string, unknown> : {};
