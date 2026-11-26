@@ -95,9 +95,9 @@ export default {
       const description = typeof parsed.description === "string" ? parsed.description.trim().slice(0, 4000) : "";
       const features = Array.isArray(parsed.features) ? parsed.features.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 8) : [];
       const keywords = Array.isArray(parsed.keywords) ? parsed.keywords.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 15) : [];
-      const titleAlternatives = Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 5) : [];
+      const titleAlternatives = Array.isArray(parsed.titleAlternatives) ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 5) : [];\n      const info = parsed.productInfo && typeof parsed.productInfo === "object" ? parsed.productInfo as Record<string, unknown> : {};\n      const productInfo = Object.fromEntries(["category", "brand", "material", "dimensions", "color", "audience", "usage", "packageContents", "care", "warranty", "origin"].map(key => [key, typeof info[key] === "string" ? (info[key] as string).trim().slice(0, 300) : ""]));
       if (!title || !description || features.length < 3) return json({ error: "كانت استجابة النموذج ناقصة. أعد المحاولة مع إضافة مواصفات أوضح." }, 502);
-      return json({ title, description, features, keywords, titleAlternatives });
+      return json({ title, description, features, keywords, titleAlternatives, productInfo });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       return json({
