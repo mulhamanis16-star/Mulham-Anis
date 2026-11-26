@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, Download, FileSpreadsheet, Layers3, RotateCcw, Sparkles, Store, WandSparkles } from 'lucide-react';
 
 type Platform = 'نون' | 'أمازون' | 'ترينديول' | 'زد' | 'سلة';
 type Draft = { title: string; description: string; features: string[]; keywords: string[] };
+type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };
+const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
 const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -36,6 +38,15 @@ export default function App() {
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [savedDrafts, setSavedDrafts] = useState<SavedDraft[]>(() => {
+    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) as SavedDraft[] : []; }
+    catch { return []; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDrafts)); }
+    catch { setNotice('تعذّر حفظ السجل على هذا الجهاز؛ قد تكون مساحة التخزين ممتلئة.'); }
+  }, [savedDrafts]);
   const remaining = 1200 - details.length;
 
   const fullText = useMemo(() => result ? [
@@ -49,7 +60,10 @@ export default function App() {
     if (details.length > 1200) { setError('اختصر المواصفات إلى 1200 حرف كحد أقصى.'); return; }
     setError('');
     setNotice('');
-    setResult(makeDraft(productName, details, platform));
+    const draft = makeDraft(productName, details, platform);
+    setResult(draft);
+    setSavedDrafts(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: productName, details, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
+    setNotice('تم إنشاء المسودة وحفظها في سجل هذا الجهاز.');
   }
 
   async function copyAll() {
@@ -82,6 +96,15 @@ export default function App() {
   }
 
   function reset() { setName(''); setDetails(''); setResult(null); setError(''); setNotice(''); }
+
+  function openSaved(item: SavedDraft) {
+    setName(item.name); setDetails(item.details); setPlatform(item.platform); setResult(item.result); setError(''); setNotice('تم فتح المسودة المحفوظة.');
+  }
+
+  function deleteSaved(id: string) {
+    setSavedDrafts(current => current.filter(item => item.id !== id));
+    setNotice('تم حذف المسودة من سجل هذا الجهاز.');
+  }
 
   return <main className="shell">
     <header>
@@ -122,6 +145,13 @@ export default function App() {
         {notice && <p className="notice" role="status">{notice}</p>}
         <div className="foot"><FileSpreadsheet size={16}/> التصدير متاح بصيغة CSV المتوافقة مع Excel</div>
       </article>
+    </section>
+    <section className="history panel">
+      <div className="history-head"><div><h2>سجل المنتجات المحفوظة</h2><p>تُحفظ المسودات على هذا المتصفح فقط، ولا تُرفع إلى خادم.</p></div><span>{savedDrafts.length} / 30</span></div>
+      {savedDrafts.length === 0 ? <p className="history-empty">لا توجد مسودات محفوظة بعد. أنشئ أول مسودة لتظهر هنا.</p> : <div className="history-list">{savedDrafts.map(item => <article className="history-item" key={item.id}>
+        <div className="history-info"><strong>{item.name}</strong><span>{item.platform} · {new Date(item.savedAt).toLocaleString('ar')}</span></div>
+        <div className="history-actions"><button type="button" className="copy" onClick={() => openSaved(item)}>فتح</button><button type="button" className="history-delete" onClick={() => deleteSaved(item.id)} aria-label={`حذف ${item.name}`}>حذف</button></div>
+      </article>)}</div>}
     </section>
     <footer>© 2026 Nova AI Stores <span>أدوات عربية لأصحاب المتاجر الإلكترونية</span></footer>
   </main>;
