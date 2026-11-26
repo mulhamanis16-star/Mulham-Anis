@@ -21,6 +21,7 @@ const productInfoFields: { key: keyof ProductInfo; label: string; placeholder: s
   { key: 'origin', label: 'بلد المنشأ', placeholder: 'بلد التصنيع إذا كان مؤكداً' },
 ];
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
+const AI_ENDPOINT_KEY = 'nova-ai-stores:ai-endpoint:v1';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
 const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -95,7 +96,7 @@ function makeDraft(name: string, details: string, platform: Platform): Draft {
     ? specs.slice(0, 6).map(x => x.charAt(0).toUpperCase() + x.slice(1))
     : ['أضف الخامة أو المواد المستخدمة', 'أضف المقاس أو الأبعاد', 'وضّح الاستخدام الأساسي للمنتج'];
   const keywords = Array.from(new Set([shortName, ...specs])).slice(0, 10);
-  return { title, description, features, keywords };
+  return { title, description, features, keywords: keywordIdeas(shortName, details), titleAlternatives };
 }
 
 export default function App() {
@@ -105,6 +106,8 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
+  const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || '');
+  const [aiBusy, setAiBusy] = useState(false);
   const [error, setError] = useState('');
   const [bulkInput, setBulkInput] = useState('');
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
@@ -113,6 +116,8 @@ export default function App() {
     try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) as SavedDraft[] : []; }
     catch { return []; }
   });
+
+  useEffect(() => { localStorage.setItem(AI_ENDPOINT_KEY, aiEndpoint.trim()); }, [aiEndpoint]);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDrafts)); }
@@ -155,6 +160,40 @@ export default function App() {
     setResult(draft);
     setSavedDrafts(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: productName, details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
     setNotice('تم إنشاء المسودة وحفظها في سجل هذا الجهاز.');
+  }
+
+  async function enhanceWithAI() {
+    const endpoint = aiEndpoint.trim().replace(/\\/$/, '');
+    if (!endpoint || !/^https:\\/\\//i.test(endpoint)) {
+      setError('أدخل أولاً رابط خادم Cloudflare Worker المنشور في خانة إعداد الذكاء الاصطناعي.');
+      return;
+    }
+    if (clean(name).length < 2) { setError('اكتب اسم المنتج أولاً.'); return; }
+    const completeDetails = [details, ...productInfoFields.map(field => productInfo[field.key] ? `${field.label}: ${clean(productInfo[field.key])}` : '')].filter(Boolean).join('\\n');
+    setAiBusy(true); setError(''); setNotice('جارٍ إرسال بيانات المنتج إلى محرك الذكاء الاصطناعي...');
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: clean(name), details: completeDetails, platform })
+      });
+      const payload = await response.json() as Draft & { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'تعذّر توليد المحتوى.');
+      if (!payload.title || !payload.description) throw new Error('استجابة الذكاء الاصطناعي غير مكتملة.');
+      const draft: Draft = {
+        title: payload.title,
+        description: payload.description,
+        features: Array.isArray(payload.features) ? payload.features : [],
+        keywords: Array.isArray(payload.keywords) ? payload.keywords : [],
+        titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives : []
+      };
+      setResult(draft);
+      setSavedDrafts(current => [{ id: `ai-${Date.now()}`, name: clean(name), details: completeDetails, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
+      setNotice('تم إنشاء محتوى بالذكاء الاصطناعي وحفظه محلياً. راجعه قبل النشر.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي.');
+      setNotice('');
+    } finally { setAiBusy(false); }
   }
 
   async function importBulkCsv(file?: File) {
@@ -306,7 +345,13 @@ export default function App() {
         <label>منصة البيع</label>
         <div className="platforms">{platforms.map(p => <button type="button" key={p} aria-pressed={platform === p} className={platform === p ? 'active' : ''} onClick={() => { setPlatform(p); setResult(null); }}>{p}</button>)}</div>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>
+        <button className="generate" disabled={clean(name).length < 2} onClick={generate}><WandSparkles size={18}/> إنشاء مسودة المحتوى</button>\n        <div className="ai-connection">
+          <strong>ربط محرك الذكاء الاصطناعي</strong>
+          <input aria-label="رابط Cloudflare Worker" value={aiEndpoint} onChange={e => setAiEndpoint(e.target.value)} placeholder="ألصق رابط Worker بعد نشره على Cloudflare" />
+          <small>يُحفظ الرابط في هذا المتصفح فقط. لا تضع أي مفتاح سري هنا.</small>
+          <button type="button" className="generate ai-generate" disabled={aiBusy || clean(name).length < 2} onClick={() => void enhanceWithAI()}><Sparkles size={17}/>{aiBusy ? 'جارٍ التوليد بالذكاء الاصطناعي...' : 'إنشاء محتوى بالذكاء الاصطناعي'}</button>
+        </div>
+
         <button className="reset" type="button" onClick={reset}><RotateCcw size={14}/> مسح البيانات</button>
         <p className="hint">هذه نسخة تجريبية تولّد المسودة محلياً بقواعد نصية. لم يتم ربط خدمة ذكاء اصطناعي خارجية بعد.</p>
       </article>
@@ -319,7 +364,7 @@ export default function App() {
           </section>
           <section><small>الوصف</small><textarea className="edit-field" aria-label="تعديل وصف المنتج" rows={5} value={result.description} onChange={e => setResult(prev => prev ? { ...prev, description: e.target.value } : prev)} /></section>
           <section><small>المميزات</small><textarea className="edit-field" aria-label="تعديل مميزات المنتج، كل ميزة في سطر" rows={4} value={result.features.join("\n")} onChange={e => setResult(prev => prev ? { ...prev, features: e.target.value.split("\n").map(x => x.trim()).filter(Boolean) } : prev)} /></section>
-          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /><small className="suggestion-note">اقتراحات مستخرجة من اسم المنتج ومواصفاته المدخلة، وليست أحجام بحث أو ترتيباً مؤكداً.</small></section>
+          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /><small className="suggestion-note">اقتراحات أولية من بيانات المنتج؛ ليست أحجام بحث فعلية أو ترتيباً مضموناً. عند ربط محرك AI يمكن طلب صياغة أكثر ذكاءً.</small></section>
           <p className="review-note">راجع العنوان والوصف والكلمات المفتاحية قبل نشرها، وتأكد من توافقها مع سياسات منصة البيع.</p>
         </>}
         {notice && <p className="notice" role="status">{notice}</p>}
