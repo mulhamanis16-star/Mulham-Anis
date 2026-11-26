@@ -227,19 +227,18 @@ export default function App() {
       const info = payload.productInfo || {};
       const dimensionMatch = specs.match(/(?:المقاس\s*)?\d+(?:\.\d+)?\s*[×xX]\s*\d+(?:\.\d+)?\s*(?:سم|cm)?/i);
       const isPillow = /وسادة|مخدة|مخدّة/.test(productName);
-      const unknown = 'غير مذكور في البيانات';
       setProductInfo({
-        category: clean(info.category || '') || (isPillow ? 'وسائد ومخدات ديكور' : 'غير محدد تلقائياً'),
-        brand: clean(info.brand || '') || unknown,
-        material: clean(info.material || '') || unknown,
-        dimensions: clean(info.dimensions || '') || dimensionMatch?.[0] || unknown,
-        color: clean(info.color || '') || unknown,
-        audience: clean(info.audience || '') || 'للاستخدام المنزلي',
-        usage: clean(info.usage || '') || (isPillow ? 'للاستخدام كوسادة ديكور وتنسيق المفروشات المنزلية' : 'استخدام المنتج بحسب طبيعته'),
-        packageContents: clean(info.packageContents || '') || unknown,
-        care: clean(info.care || '') || unknown,
-        warranty: clean(info.warranty || '') || unknown,
-        origin: clean(info.origin || '') || unknown
+        category: clean(info.category || ''),
+        brand: clean(info.brand || ''),
+        material: clean(info.material || ''),
+        dimensions: clean(info.dimensions || '') || dimensionMatch?.[0] || '',
+        color: clean(info.color || ''),
+        audience: clean(info.audience || ''),
+        usage: clean(info.usage || ''),
+        packageContents: clean(info.packageContents || ''),
+        care: clean(info.care || ''),
+        warranty: clean(info.warranty || ''),
+        origin: clean(info.origin || '')
       });
       if (payload.title && payload.description) {
         setResult({
@@ -450,7 +449,18 @@ export default function App() {
           {productImage && <button type="button" className="remove-image" onClick={() => setProductImage('')}><X size={14}/> إزالة الصورة</button>}
         </div>
         <label htmlFor="product-name">اسم المنتج</label>
-        <input id="product-name" value={name} maxLength={300} onChange={e => setName(e.target.value)} onPaste={e => { const value = e.clipboardData.getData("text").trim(); if (value.includes("|")) { e.preventDefault(); void autoFillFromOneLine(value); } }} placeholder="الصق هنا: وسادة ديكور | المقاس 45×45 سم، حشوة 400 غرام"/>
+        <input id="product-name" value={name} maxLength={120} onChange={e => setName(e.target.value)} onPaste={e => {
+          const value = e.clipboardData.getData("text").trim();
+          if (value.includes("|")) { e.preventDefault(); void autoFillFromOneLine(value); }
+          else if (value && value !== clean(name)) {
+            setDetails('');
+            setProductInfo(emptyProductInfo);
+            setResult(null);
+            setError('');
+            setName(value);
+            setNotice('تم تحديث اسم المنتج ومسح مواصفات المنتج السابق حتى لا تختلط البيانات.');
+          }
+        }} placeholder="الصق هنا: وسادة ديكور | المقاس 45×45 سم، حشوة 400 غرام"/>
         <div className="field-meta"><span>اسم واضح ومحدد يساعد على إنتاج عنوان أفضل.</span><span>{name.length}/120</span></div>
         <label htmlFor="product-details">المواصفات والتفاصيل</label>
         <textarea id="product-details" rows={6} value={details} maxLength={1200} onChange={e => setDetails(e.target.value)} placeholder={'اكتب كل مواصفة في سطر أو افصل بينها بفاصلة:\nالمقاس 160×200 سم\nغطاء قطني\nالسماكة 5 سم\nاللون أبيض'}/>
@@ -492,7 +502,7 @@ export default function App() {
         {!result ? <div className="empty"><div className="spark"><Sparkles/></div><h3>المحتوى سيظهر هنا</h3><p>أدخل اسم المنتج أو أرفق صورته ومواصفاته ثم أنشئ المسودة.</p><div className="tags"><span>عنوان</span><span>وصف</span><span>مميزات</span><span>كلمات مفتاحية</span></div></div> : <>
           <div className="outputbar"><span>مسودة المنتج · {platform}</span><div><button className="copy" onClick={copyAll}><Copy size={14}/> نسخ الكل</button><button className="copy export" onClick={exportCsv}><Download size={14}/> تصدير CSV</button></div></div>
           <section><small>عنوان المنتج</small><textarea className="edit-field title-edit" aria-label="تعديل عنوان المنتج" rows={2} value={result.title} onChange={e => setResult(prev => prev ? { ...prev, title: e.target.value } : prev)} />
-            {!!result.titleAlternatives?.length && <div className="title-suggestions"><strong>عناوين بديلة مقترحة</strong><div>{result.titleAlternatives.map((title, index) => <button type="button" key={index} onClick={() => setResult(prev => prev ? { ...prev, title } : prev)}>{title} <span>استخدام</span></button>)}</div></div>}
+            {!!result.titleAlternatives?.length && <div className="title-suggestions"><strong>عناوين بديلة مقترحة</strong><div>{result.titleAlternatives.map((title, index) => <button type="button" key={index} onClick={() => setResult(prev => prev ? { ...prev, title } : prev)}>{title} <span>اعتماد العنوان</span></button>)}</div></div>}
           </section>
           <section><small>الوصف</small><textarea className="edit-field" aria-label="تعديل وصف المنتج" rows={5} value={result.description} onChange={e => setResult(prev => prev ? { ...prev, description: e.target.value } : prev)} /></section>
           <section><small>المميزات</small><textarea className="edit-field" aria-label="تعديل مميزات المنتج، كل ميزة في سطر" rows={4} value={result.features.join("\n")} onChange={e => setResult(prev => prev ? { ...prev, features: e.target.value.split("\n").map(x => x.trim()).filter(Boolean) } : prev)} /></section>
