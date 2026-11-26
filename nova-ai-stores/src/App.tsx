@@ -3,12 +3,31 @@ import { Copy, Download, FileSpreadsheet, Layers3, RotateCcw, Sparkles, Store, W
 
 type Platform = 'نون' | 'أمازون' | 'ترينديول' | 'زد' | 'سلة';
 type Draft = { title: string; description: string; features: string[]; keywords: string[] };
-type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };
+type SavedDraft = { id: string; name: string; details: string; platform: Platform; result: Draft; savedAt: string };\ntype BulkResult = { name: string; details: string; result: Draft };
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
 const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
 const csvCell = (value: string) => '"' + value.replace(/"/g, '""') + '"';
+function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' && quoted && text[i + 1] === '"') { cell += '"'; i++; }
+    else if (ch === '"') quoted = !quoted;
+    else if (ch === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+    else if ((ch === '\\n' || ch === '\\r') && !quoted) {
+      if (ch === '\\r' && text[i + 1] === '\\n') i++;
+      row.push(cell.trim()); cell = '';
+      if (row.some(x => x)) rows.push(row);
+      row = [];
+    } else cell += ch;
+  }
+  row.push(cell.trim());
+  if (row.some(x => x)) rows.push(row);
+  return rows;
+}
 
 function makeDraft(name: string, details: string, platform: Platform): Draft {
   const specs = splitDetails(details);
@@ -37,7 +56,7 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState('');\n  const [bulkInput, setBulkInput] = useState('');\n  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);\n  const [bulkError, setBulkError] = useState('');
   const [savedDrafts, setSavedDrafts] = useState<SavedDraft[]>(() => {
     try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) as SavedDraft[] : []; }
     catch { return []; }
@@ -64,6 +83,57 @@ export default function App() {
     setResult(draft);
     setSavedDrafts(current => [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: productName, details, platform, result: draft, savedAt: new Date().toISOString() }, ...current].slice(0, 30));
     setNotice('تم إنشاء المسودة وحفظها في سجل هذا الجهاز.');
+  }
+
+  async function importBulkCsv(file?: File) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) { setBulkError('اختر ملف CSV فقط.'); return; }
+    try {
+      const rows = parseCsvRows(await file.text());
+      if (rows.length === 0) { setBulkError('الملف فارغ أو لا يحتوي بيانات.'); return; }
+      const first = rows[0].join(' ').toLowerCase();
+      const hasHeader = /اسم|name|product|منتج/.test(first);
+      const data = (hasHeader ? rows.slice(1) : rows)
+        .map(row => ({ name: clean(row[0] || ''), details: clean(row.slice(1).join('، ')) }))
+        .filter(row => row.name.length >= 2);
+      if (!data.length) { setBulkError('لم أجد أسماء منتجات. اجعل العمود الأول اسم المنتج والثاني المواصفات.'); return; }
+      if (data.length > 100) { setBulkError('الحد الأقصى 100 منتج في الملف الواحد.'); return; }
+      setBulkInput(data.map(row => row.name + (row.details ? ' | ' + row.details : '')).join('\\n'));
+      setBulkError('');
+      setNotice('تم استيراد ' + data.length + ' منتج من الملف. اضغط إنشاء المحتوى الدفعي.');
+    } catch { setBulkError('تعذّر قراءة الملف. تأكد أنه CSV محفوظ بترميز UTF-8.'); }
+  }
+
+  function generateBulk() {
+    const rows = bulkInput.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+    if (!rows.length) { setBulkError('أضف منتجات أو استورد ملف CSV أولاً.'); return; }
+    if (rows.length > 100) { setBulkError('الحد الأقصى 100 منتج في الدفعة الواحدة.'); return; }
+    const parsed = rows.map(line => {
+      const separator = line.indexOf('|');
+      return { name: clean(separator >= 0 ? line.slice(0, separator) : line), details: clean(separator >= 0 ? line.slice(separator + 1) : '') };
+    }).filter(row => row.name.length >= 2);
+    if (!parsed.length) { setBulkError('تأكد من كتابة اسم صحيح لكل منتج.'); return; }
+    const generated = parsed.map(row => ({ ...row, result: makeDraft(row.name, row.details, platform) }));
+    const now = Date.now();
+    setBulkResults(generated);
+    setSavedDrafts(current => [
+      ...generated.map((item, index) => ({ id: 'bulk-' + (now + index), name: item.name, details: item.details, platform, result: item.result, savedAt: new Date(now + index).toISOString() })),
+      ...current
+    ].slice(0, 30));
+    setBulkError('');
+    setNotice('تم إنشاء ' + generated.length + ' مسودة وحفظها في سجل هذا الجهاز.');
+  }
+
+  function exportBulkCsv() {
+    if (!bulkResults.length) return;
+    const rows = [
+      ['اسم المنتج', 'المنصة', 'العنوان', 'الوصف', 'المميزات', 'الكلمات المفتاحية'],
+      ...bulkResults.map(item => [item.name, platform, item.result.title, item.result.description, item.result.features.join(' | '), item.result.keywords.join('، ')])
+    ];
+    const csv = '\\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\\r\\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'nova-bulk-products.csv';
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
   }
 
   async function copyAll() {
@@ -115,6 +185,20 @@ export default function App() {
       <div className="eyebrow"><Sparkles size={15}/> أدوات عملية للتجارة الإلكترونية</div>
       <h1>جهّز محتوى منتجك<br/><em>بخطوات أبسط</em></h1>
       <p>أدخل بيانات المنتج، اختر منصة البيع، واحصل على مسودة قابلة للتعديل والتصدير.</p>
+    </section>
+    <section className="bulk-panel panel">
+      <div className="heading"><FileSpreadsheet/><h2>إعداد محتوى مجموعة منتجات</h2></div>
+      <p className="bulk-help">أدخل كل منتج في سطر بهذا الشكل: اسم المنتج | المواصفات. أو استورد ملف CSV بعمود أول لاسم المنتج وعمود ثانٍ للمواصفات. حتى 100 منتج في الدفعة.</p>
+      <textarea className="bulk-input" rows={5} value={bulkInput} onChange={e => setBulkInput(e.target.value)} placeholder={'لباد سرير فندقي 5 سم | مقاس 160×200، غطاء قطني، لون أبيض\\nمخدة ديكور | مقاس 45×45، حشوة 400 غرام'} />
+      <div className="bulk-actions">
+        <label className="copy import-button" htmlFor="bulk-csv">استيراد ملف CSV</label>
+        <input id="bulk-csv" type="file" accept=".csv,text/csv" hidden onChange={e => { void importBulkCsv(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+        <button className="generate bulk-generate" type="button" onClick={generateBulk}><WandSparkles size={17}/> إنشاء محتوى الدفعة</button>
+        {bulkResults.length > 0 && <button className="copy" type="button" onClick={exportBulkCsv}><Download size={14}/> تصدير النتائج CSV ({bulkResults.length})</button>}
+      </div>
+      {bulkError && <p className="error" role="alert">{bulkError}</p>}
+      {bulkResults.length > 0 && <div className="bulk-results"><strong>تم تجهيز {bulkResults.length} منتج</strong><div className="bulk-result-list">{bulkResults.slice(0, 5).map((item, i) => <div key={i}><span>{item.name}</span><small>{item.result.title}</small></div>)}</div>{bulkResults.length > 5 && <small>ويظهر باقي المحتوى في ملف CSV عند التصدير.</small>}</div>}
+      <p className="hint">المعالجة الحالية محلية بقواعد نصية تجريبية وليست ذكاءً اصطناعياً فعلياً. راجع البيانات قبل رفعها للمنصة.</p>
     </section>
     <section className="workspace">
       <article className="panel">
