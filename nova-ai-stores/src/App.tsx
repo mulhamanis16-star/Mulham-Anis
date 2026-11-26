@@ -193,13 +193,13 @@ export default function App() {
       const info = payload.productInfo || {};
       const unknown = 'غير مذكور في البيانات';
       setProductInfo({
-        category: clean(info.category || '') || 'غير محدد تلقائياً',
+        category: clean(info.category || '') || (isPillow ? 'وسائد ومخدات ديكور' : 'غير محدد تلقائياً'),
         brand: clean(info.brand || '') || unknown,
         material: clean(info.material || '') || unknown,
-        dimensions: clean(info.dimensions || '') || (/(مقاس|مقاسات|سم|ملم|×|x)/i.test(specs) ? specs : unknown),
+        dimensions: clean(info.dimensions || '') || dimensionMatch?.[0] || unknown,
         color: clean(info.color || '') || unknown,
         audience: clean(info.audience || '') || 'للاستخدام المنزلي',
-        usage: clean(info.usage || '') || 'وسادة ديكور للاستخدام وتنسيق المفروشات المنزلية',
+        usage: clean(info.usage || '') || (isPillow ? 'للاستخدام كوسادة ديكور وتنسيق المفروشات المنزلية' : 'استخدام المنتج بحسب طبيعته'),
         packageContents: clean(info.packageContents || '') || unknown,
         care: clean(info.care || '') || unknown,
         warranty: clean(info.warranty || '') || unknown,
