@@ -21,7 +21,6 @@ const productInfoFields: { key: keyof ProductInfo; label: string; placeholder: s
   { key: 'origin', label: 'بلد المنشأ', placeholder: 'بلد التصنيع إذا كان مؤكداً' },
 ];
 const STORAGE_KEY = 'nova-ai-stores:saved-drafts:v1';
-const AI_ENDPOINT_KEY = 'nova-ai-stores:ai-endpoint:v2';
 const DEFAULT_AI_ENDPOINT = 'https://bold-bush-b254.mulhamanis16.workers.dev/';
 const platforms: Platform[] = ['نون', 'أمازون', 'ترينديول', 'زد', 'سلة'];
 const splitDetails = (value: string) => value.split(/[،,؛;\n]+/).map(x => x.trim()).filter(Boolean);
@@ -146,7 +145,6 @@ export default function App() {
   const [platform, setPlatform] = useState<Platform>('نون');
   const [result, setResult] = useState<Draft | null>(null);
   const [notice, setNotice] = useState('');
-  const [aiEndpoint, setAiEndpoint] = useState(() => localStorage.getItem(AI_ENDPOINT_KEY) || DEFAULT_AI_ENDPOINT);
   const [aiBusy, setAiBusy] = useState(false);
   const [autoFillBusy, setAutoFillBusy] = useState(false);
   const [error, setError] = useState('');
@@ -159,7 +157,6 @@ export default function App() {
     catch { return []; }
   });
 
-  useEffect(() => { localStorage.setItem(AI_ENDPOINT_KEY, aiEndpoint.trim()); }, [aiEndpoint]);
 
   // استخرج الحقول المؤكدة فور كتابة الاسم أو المواصفات، دون انتظار استجابة الذكاء الاصطناعي.
   useEffect(() => {
@@ -268,7 +265,7 @@ export default function App() {
     setError('');
     setNotice('تم استبدال بيانات المنتج السابق. جارٍ تحليل المنتج الجديد فقط...');
     if (productName.length < 2) return;
-    const endpoint = aiEndpoint.trim().replace(/\/$/, '');
+    const endpoint = DEFAULT_AI_ENDPOINT.replace(/\/$/, '');
     if (!endpoint || !/^https:\/\//i.test(endpoint)) {
       setError('تعذّر الملء التلقائي: تحقق من رابط محرك الذكاء الاصطناعي.');
       return;
@@ -313,9 +310,9 @@ export default function App() {
   }
 
   async function enhanceWithAI() {
-    const endpoint = aiEndpoint.trim().replace(/\/$/, '');
+    const endpoint = DEFAULT_AI_ENDPOINT.replace(/\/$/, '');
     if (!endpoint || !/^https:\/\//i.test(endpoint)) {
-      setError('أدخل أولاً رابط خادم Cloudflare Worker المنشور في خانة إعداد الذكاء الاصطناعي.');
+      setError('تعذّر تحديد خادم الذكاء الاصطناعي. أعد تحميل الصفحة وحاول مجدداً.');
       return;
     }
     if (clean(name).length < 2 && !productImage) { setError('اكتب اسم المنتج أو أرفق صورة للمنتج أولاً.'); return; }
@@ -406,8 +403,8 @@ export default function App() {
     const rows = bulkInput.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     if (!rows.length) { setBulkError('أضف منتجات أو استورد ملف CSV أولاً.'); return; }
     if (rows.length > 100) { setBulkError('الحد الأقصى 100 منتج في الدفعة الواحدة.'); return; }
-    const endpoint = aiEndpoint.trim().replace(/\/$/, '');
-    if (!endpoint || !/^https:\/\//i.test(endpoint)) { setBulkError('تحقق من رابط خادم الذكاء الاصطناعي في إعدادات الربط.'); return; }
+    const endpoint = DEFAULT_AI_ENDPOINT.replace(/\/$/, '');
+    if (!endpoint || !/^https:\/\//i.test(endpoint)) { setBulkError('تعذّر تحديد خادم الذكاء الاصطناعي. أعد تحميل الصفحة وحاول مجدداً.'); return; }
     const parsed = rows.map(line => {
       const separator = line.indexOf('|');
       return { name: clean(separator >= 0 ? line.slice(0, separator) : line), details: clean(separator >= 0 ? line.slice(separator + 1) : '') };
