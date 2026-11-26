@@ -191,6 +191,8 @@ export default function App() {
       const payload = await response.json() as Draft & { error?: string; productInfo?: Partial<ProductInfo> };
       if (!response.ok) throw new Error(payload.error || 'تعذّر تحليل بيانات المنتج.');
       const info = payload.productInfo || {};
+      const dimensionMatch = specs.match(/(?:المقاس\s*)?\d+(?:\.\d+)?\s*[×xX]\s*\d+(?:\.\d+)?\s*(?:سم|cm)?/i);
+      const isPillow = /وسادة|مخدة|مخدّة/.test(productName);
       const unknown = 'غير مذكور في البيانات';
       setProductInfo({
         category: clean(info.category || '') || (isPillow ? 'وسائد ومخدات ديكور' : 'غير محدد تلقائياً'),
