@@ -167,14 +167,28 @@ export default {
       const keywords = unique([...keywordCandidates, name, ...detailFacts]).filter(x => x.length > 1).slice(0, 15);
       const dimensionsMatch = details.match(/\d{1,4}(?:[.,]\d+)?\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?(?:\s*[×xX]\s*\d{1,4}(?:[.,]\d+)?)?\s*(?:سم|cm)?/i);
       const dimensions = dimensionsMatch?.[0]?.trim() || "";
-      const validModelTitle = modelTitle.length >= resolvedName.length && (!name || modelTitle.startsWith(name)) && !/سما$/i.test(modelTitle);
+      const stripRepeatedBrandAndSize = (candidate: string) => {
+        if (!candidate.startsWith(resolvedName)) return "";
+        let suffix = candidate.slice(resolvedName.length);
+        // لا تكرر العلامة التجارية إذا كانت موجودة أصلاً في اسم المنتج.
+        suffix = suffix.replace(/^\s*(?:[-–—|،]\s*)?(?:Kunzita\s*Home|كونزيتا\s*هوم|كونزايتا\s*هوم)\s*/i, " ");
+        // لا تكرر المقاس إذا كان موجوداً في اسم المنتج بالفعل.
+        if (dimensions && resolvedName.includes(dimensions)) {
+          const escaped = dimensions.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
+          suffix = suffix.replace(new RegExp("\\s*(?:بمقاس|مقاس)\\s*" + escaped, "ig"), "");
+        }
+        suffix = suffix.replace(/\s+/g, " ").replace(/^\s*[-–—|،]\s*/, " ").trim();
+        return (resolvedName + (suffix ? " " + suffix : "")).trim();
+      };
+      const cleanedModelTitle = stripRepeatedBrandAndSize(modelTitle);
+      const validModelTitle = cleanedModelTitle.length >= resolvedName.length && !/سما$/i.test(cleanedModelTitle);
       const weightMatch = details.match(/(?:حشوة|وزن|الوزن)\s*[:：]?\s*(\d+(?:[.,]\d+)?\s*(?:غرام|جرام|غ|كغ|كيلو))/i);
-      const seoTitle = [resolvedName, dimensions, weightMatch ? "بحشوة " + weightMatch[1].trim() : ""].filter(Boolean).join(" ");
-      const title = validModelTitle && modelTitle.length >= seoTitle.length - 12 ? modelTitle : seoTitle;
+      const seoTitle = [resolvedName, dimensions && !resolvedName.includes(dimensions) ? dimensions : "", weightMatch && !resolvedName.includes(weightMatch[1].trim()) ? "بحشوة " + weightMatch[1].trim() : ""].filter(Boolean).join(" ");
+      const title = validModelTitle && cleanedModelTitle.length >= seoTitle.length - 12 ? cleanedModelTitle : seoTitle;
       const alternativesFromModel = Array.isArray(parsed.titleAlternatives)
         ? parsed.titleAlternatives.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
         : [];
-      const titleAlternatives = unique([...alternativesFromModel.map(x => x.trim()).filter(x => !/سما$/i.test(x) && x.startsWith(resolvedName) && x.length >= resolvedName.length), dimensions ? resolvedName + " بمقاس " + dimensions : resolvedName + " للاستخدام اليومي"]).filter(x => x !== title).slice(0, 5);
+      const titleAlternatives = unique(alternativesFromModel.map(x => stripRepeatedBrandAndSize(x.trim())).filter(x => x && !/سما$/i.test(x) && x.length >= resolvedName.length && x !== title)).slice(0, 4);
       const info = parsed.productInfo && typeof parsed.productInfo === "object" ? parsed.productInfo as Record<string, unknown> : {};
       const productInfo = Object.fromEntries(["category", "brand", "material", "dimensions", "color", "audience", "usage", "packageContents", "care", "warranty", "origin"].map(key => [key, typeof info[key] === "string" ? (info[key] as string).trim().slice(0, 300) : ""]));
       return json({ title: title.slice(0, 220), description, features, keywords, titleAlternatives, productInfo });
