@@ -113,6 +113,7 @@ export default function App() {
   const [bulkInput, setBulkInput] = useState('');
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
   const [bulkError, setBulkError] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [savedDrafts, setSavedDrafts] = useState<SavedDraft[]>(() => {
     try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) as SavedDraft[] : []; }
     catch { return []; }
@@ -232,24 +233,40 @@ export default function App() {
     } catch { setBulkError('تعذّر قراءة الملف. تأكد أنه CSV محفوظ بترميز UTF-8.'); }
   }
 
-  function generateBulk() {
+  async function generateBulk() {
     const rows = bulkInput.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     if (!rows.length) { setBulkError('أضف منتجات أو استورد ملف CSV أولاً.'); return; }
     if (rows.length > 100) { setBulkError('الحد الأقصى 100 منتج في الدفعة الواحدة.'); return; }
+    const endpoint = aiEndpoint.trim().replace(/\/$/, '');
+    if (!endpoint || !/^https:\/\//i.test(endpoint)) { setBulkError('تحقق من رابط خادم الذكاء الاصطناعي في إعدادات الربط.'); return; }
     const parsed = rows.map(line => {
       const separator = line.indexOf('|');
       return { name: clean(separator >= 0 ? line.slice(0, separator) : line), details: clean(separator >= 0 ? line.slice(separator + 1) : '') };
     }).filter(row => row.name.length >= 2);
     if (!parsed.length) { setBulkError('تأكد من كتابة اسم صحيح لكل منتج.'); return; }
-    const generated = parsed.map(row => ({ ...row, result: makeDraft(row.name, row.details, platform) }));
-    const now = Date.now();
-    setBulkResults(generated);
-    setSavedDrafts(current => [
-      ...generated.map((item, index) => ({ id: 'bulk-' + (now + index), name: item.name, details: item.details, platform, result: item.result, savedAt: new Date(now + index).toISOString() })),
-      ...current
-    ].slice(0, 30));
-    setBulkError('');
-    setNotice('تم إنشاء ' + generated.length + ' مسودة وحفظها في سجل هذا الجهاز.');
+    setBulkBusy(true); setBulkError(''); setBulkResults([]);
+    setNotice('جارٍ إنشاء محتوى الدفعة بالذكاء الاصطناعي...');
+    const generated: BulkResult[] = [];
+    try {
+      for (let i = 0; i < parsed.length; i++) {
+        const item = parsed[i];
+        setNotice('الذكاء الاصطناعي يعالج المنتج ' + (i + 1) + ' من ' + parsed.length + ': ' + item.name);
+        const response = await fetch(endpoint, { method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name: item.name, details: item.details, platform }) });
+        const responseText = await response.text();
+        let payload: (Draft & { error?: string }) | null = null;
+        try { payload = JSON.parse(responseText) as Draft & { error?: string }; } catch { /* report below */ }
+        if (!response.ok) throw new Error(payload?.error || 'فشل المنتج ' + item.name + ' (HTTP ' + response.status + ').');
+        if (!payload?.title || !payload.description || !Array.isArray(payload.features)) throw new Error('وصل محتوى غير مكتمل للمنتج ' + item.name + '.');
+        generated.push({ ...item, result: { title: payload.title, description: payload.description, features: payload.features.filter((x): x is string => typeof x === 'string'), keywords: Array.isArray(payload.keywords) ? payload.keywords.filter((x): x is string => typeof x === 'string') : [], titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string') : [] } });
+        setBulkResults([...generated]);
+      }
+      const now = Date.now();
+      setSavedDrafts(current => [...generated.map((item, index) => ({ id: 'bulk-ai-' + (now + index), name: item.name, details: item.details, platform, result: item.result, savedAt: new Date(now + index).toISOString() })), ...current].slice(0, 30));
+      setNotice('تم إنشاء ' + generated.length + ' منتج بالذكاء الاصطناعي وحفظها في السجل. راجع النتائج قبل النشر.');
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : 'حدث خطأ أثناء إنشاء محتوى الدفعة.');
+      setNotice(generated.length ? 'تم إنشاء ' + generated.length + ' منتج قبل توقف العملية بسبب الخطأ.' : '');
+    } finally { setBulkBusy(false); }
   }
 
   function exportBulkCsv() {
@@ -321,12 +338,12 @@ export default function App() {
       <div className="bulk-actions">
         <label className="copy import-button" htmlFor="bulk-csv">استيراد ملف CSV</label>
         <input id="bulk-csv" type="file" accept=".csv,text/csv" hidden onChange={e => { void importBulkCsv(e.target.files?.[0]); e.currentTarget.value = ''; }} />
-        <button className="generate bulk-generate" type="button" onClick={generateBulk}><WandSparkles size={17}/> إنشاء محتوى الدفعة</button>
+        <button className="generate bulk-generate" type="button" disabled={bulkBusy} onClick={() => void generateBulk()}><WandSparkles size={17}/> {bulkBusy ? "جارٍ التوليد بالذكاء الاصطناعي..." : "إنشاء محتوى الدفعة بالذكاء الاصطناعي"}</button>
         {bulkResults.length > 0 && <button className="copy" type="button" onClick={exportBulkCsv}><Download size={14}/> تصدير النتائج CSV ({bulkResults.length})</button>}
       </div>
       {bulkError && <p className="error" role="alert">{bulkError}</p>}
       {bulkResults.length > 0 && <div className="bulk-results"><strong>تم تجهيز {bulkResults.length} منتج</strong><div className="bulk-result-list">{bulkResults.slice(0, 5).map((item, i) => <div key={i}><span>{item.name}</span><small>{item.result.title}</small></div>)}</div>{bulkResults.length > 5 && <small>ويظهر باقي المحتوى في ملف CSV عند التصدير.</small>}</div>}
-      <p className="hint">الاقتراحات تُبنى محلياً من البيانات المدخلة وليست نتائج بحث فعلية أو ذكاءً اصطناعياً. راجعها قبل النشر.</p>
+      <p className="hint">تُرسل بيانات كل منتج إلى محرك الذكاء الاصطناعي لإنشاء عنوان ووصف ومميزات وكلمات مفتاحية. لا تُخمن الخامة أو اللون أو الضمان إذا لم تذكرها.</p>
     </section>
     <section className="workspace">
       <article className="panel">
