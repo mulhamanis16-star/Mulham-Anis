@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/wrangler",
-  "name": "nova-ai-stores-api",
+  "name": "bold-bush-b254",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-25",
   "ai": {
