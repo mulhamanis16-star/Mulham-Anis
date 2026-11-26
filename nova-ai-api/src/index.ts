@@ -1,7 +1,8 @@
 export interface Env {
   AI: {
     run(model: string, input: {
-      messages?: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }>;
+      messages?: Array<{ role: string; content: string }>;
+      image?: string;
       prompt?: string;
       max_completion_tokens?: number;
       max_tokens?: number;
@@ -81,24 +82,15 @@ export default {
       const userText = "منصة البيع: " + platform + "\nاسم المنتج: " + (name || "غير محدد؛ استخرج الاسم الوصفي من الصورة") + "\nالمواصفات المؤكدة التي أدخلها المستخدم:\n" + (details || "لم يذكر المستخدم مواصفات إضافية.") + (hasImage ? "\nحلّل صورة المنتج المرفقة، واستخرج فقط الصفات المرئية بوضوح." : "") + "\nاكتب محتوى جاهزاً للمراجعة والنشر وفق التعليمات.";
       const messages = [
         { role: "system", content: systemPrompt },
-        { role: "user", content: hasImage ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: imageDataUrl } }] : userText }
+        { role: "user", content: userText }
       ];
       const model = hasImage ? "@cf/meta/llama-3.2-11b-vision-instruct" : "@cf/zai-org/glm-4.7-flash";
       const modelInput = {
         messages,
-        ...(hasImage ? { max_tokens: 1800 } : { max_completion_tokens: 1800, response_format: { type: "json_object" as const }, chat_template_kwargs: { enable_thinking: false } }),
+        ...(hasImage ? { image: imageDataUrl, max_tokens: 1800 } : { max_completion_tokens: 1800, response_format: { type: "json_object" as const }, chat_template_kwargs: { enable_thinking: false } }),
         temperature: 0.2
       };
-      let output: unknown;
-      try {
-        output = await env.AI.run(model, modelInput);
-      } catch (firstError) {
-        const firstMessage = firstError instanceof Error ? firstError.message : "";
-        if (!hasImage || !/license|licence|accept|agree|policy/i.test(firstMessage)) throw firstError;
-        // User approved the Meta license and acceptable-use policy in the conversation.
-        await env.AI.run("@cf/meta/llama-3.2-11b-vision-instruct", { prompt: "agree" });
-        output = await env.AI.run(model, modelInput);
-      }
+      const output: unknown = await env.AI.run(model, modelInput);
       const parsed = parseModelJson(extractModelText(output));
       if (!parsed) return json({ error: "لم يرجع النموذج محتوى منظماً صالحاً. حاول مجدداً." }, 502);
       const title = (typeof parsed.title === "string" ? parsed.title.trim() : "") || name;
