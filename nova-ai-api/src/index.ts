@@ -176,13 +176,23 @@ export default {
       const productInfo = Object.fromEntries(["category", "brand", "material", "dimensions", "color", "audience", "usage", "packageContents", "care", "warranty", "origin"].map(key => [key, typeof info[key] === "string" ? (info[key] as string).trim().slice(0, 300) : ""]));
       return json({ title: title.slice(0, 220), description, features, keywords, titleAlternatives, productInfo });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
+      const message = error instanceof Error ? error.message : String(error || "");
       const lowerMessage = message.toLowerCase();
+      // Keep detailed diagnostics in Cloudflare logs, never expose stack traces or credentials to visitors.
+      console.error("NovaStores Workers AI request failed:", message);
       const userMessage = /license|licence|accept|agree|policy/.test(lowerMessage)
-        ? "تعذّر تشغيل تحليل الصورة. تحقق من تفعيل نموذج Moondream 3.1 وشروط استخدامه وحصة Workers AI في Cloudflare، ثم أعد المحاولة."
-        : message.includes("JSON")
-          ? "تعذّر فهم استجابة النموذج. حاول مجدداً."
-          : "تعذّر الاتصال بمحرك Workers AI. تحقق من ربط AI والحصة المتاحة في Cloudflare.";
+        ? "يتطلب تحليل الصورة قبول شروط نموذج الرؤية في Cloudflare قبل استخدامه. يمكنك المتابعة مؤقتاً من دون صورة."
+        : /quota|limit|neuron|capacity|429|3040/.test(lowerMessage)
+          ? "تم بلوغ حد الاستخدام المتاح لمحرك الذكاء الاصطناعي مؤقتاً. حاول لاحقاً أو تحقق من حصة Workers AI."
+          : /binding|not configured|undefined.*ai|ai.*undefined/.test(lowerMessage)
+            ? "ربط الذكاء الاصطناعي غير مكتمل على الخادم. يلزم التحقق من إعداد Workers AI باسم AI."
+            : /timeout|timed out|deadline/.test(lowerMessage)
+              ? "استغرق محرك الذكاء الاصطناعي وقتاً أطول من المتوقع. حاول مجدداً."
+              : /model|410|5028|no such model/.test(lowerMessage)
+                ? "نموذج الذكاء الاصطناعي غير متاح حالياً. يلزم تحديث إعداد النموذج على الخادم."
+                : message.includes("JSON")
+                  ? "وصل رد من محرك الذكاء الاصطناعي، لكن تعذّر فهم تنسيقه. حاول مجدداً."
+                  : "تعذّر إكمال طلب الذكاء الاصطناعي. قد تكون الخدمة مؤقتاً غير متاحة؛ حاول مجدداً.";
       return json({ error: userMessage }, 502);
     }
   }
