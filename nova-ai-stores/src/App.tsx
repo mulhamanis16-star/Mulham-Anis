@@ -163,8 +163,8 @@ export default function App() {
   }
 
   async function enhanceWithAI() {
-    const endpoint = aiEndpoint.trim().replace(/\\/$/, '');
-    if (!endpoint || !/^https:\\/\\//i.test(endpoint)) {
+    const endpoint = aiEndpoint.trim().replace(/\/$/, '');
+    if (!endpoint || !/^https:\/\//i.test(endpoint)) {
       setError('أدخل أولاً رابط خادم Cloudflare Worker المنشور في خانة إعداد الذكاء الاصطناعي.');
       return;
     }
