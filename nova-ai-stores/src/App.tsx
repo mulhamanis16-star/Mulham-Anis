@@ -136,10 +136,10 @@ export default function App() {
         <div className="heading"><Sparkles/><h2>محتوى المنتج</h2></div>
         {!result ? <div className="empty"><div className="spark"><Sparkles/></div><h3>المحتوى سيظهر هنا</h3><p>أدخل اسم المنتج ومواصفاته ثم أنشئ المسودة.</p><div className="tags"><span>عنوان</span><span>وصف</span><span>مميزات</span><span>كلمات مفتاحية</span></div></div> : <>
           <div className="outputbar"><span>مسودة المنتج · {platform}</span><div><button className="copy" onClick={copyAll}><Copy size={14}/> نسخ الكل</button><button className="copy export" onClick={exportCsv}><Download size={14}/> تصدير CSV</button></div></div>
-          <section><small>عنوان المنتج</small><h3>{result.title}</h3></section>
-          <section><small>الوصف</small><p>{result.description}</p></section>
-          <section><small>المميزات</small><ul>{result.features.map((f, i) => <li key={i}>{f}</li>)}</ul></section>
-          <section><small>الكلمات المفتاحية</small><div className="tags">{result.keywords.map((k, i) => <span key={i}>{k}</span>)}</div></section>
+          <section><small>عنوان المنتج</small><textarea className="edit-field title-edit" aria-label="تعديل عنوان المنتج" rows={2} value={result.title} onChange={e => setResult(prev => prev ? { ...prev, title: e.target.value } : prev)} /></section>
+          <section><small>الوصف</small><textarea className="edit-field" aria-label="تعديل وصف المنتج" rows={5} value={result.description} onChange={e => setResult(prev => prev ? { ...prev, description: e.target.value } : prev)} /></section>
+          <section><small>المميزات</small><textarea className="edit-field" aria-label="تعديل مميزات المنتج، كل ميزة في سطر" rows={4} value={result.features.join("\n")} onChange={e => setResult(prev => prev ? { ...prev, features: e.target.value.split("\n").map(x => x.trim()).filter(Boolean) } : prev)} /></section>
+          <section><small>الكلمات المفتاحية</small><input className="edit-field" aria-label="تعديل الكلمات المفتاحية، افصل بينها بفاصلة" value={result.keywords.join("، ")} onChange={e => setResult(prev => prev ? { ...prev, keywords: e.target.value.split(/[،,]+/).map(x => x.trim()).filter(Boolean) } : prev)} /></section>
           <p className="review-note">راجع العنوان والوصف والكلمات المفتاحية قبل نشرها، وتأكد من توافقها مع سياسات منصة البيع.</p>
         </>}
         {notice && <p className="notice" role="status">{notice}</p>}
