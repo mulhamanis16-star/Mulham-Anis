@@ -385,7 +385,7 @@ export default function App() {
     </header>
     <section className="hero">
       <div className="eyebrow"><Sparkles size={15}/> ذكاء اصطناعي يخدم تجارتك</div>
-      <h1>حوّل بيانات منتجاتك إلى<br/><em>محتوى احترافي يرتقي بمتجرك</em></h1>
+      <h1>حوّل بيانات منتجاتك إلى<br/><em>محتوى يليق بمتجرك</em></h1>
       <p>أدخل مواصفات المنتج مرة واحدة، ودع NovaStores يجهّز لك عنواناً ووصفاً ومميزات وكلمات مفتاحية لكل منصة.</p>
     </section>
     <section className="bulk-panel panel">
