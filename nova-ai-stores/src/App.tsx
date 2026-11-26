@@ -87,6 +87,25 @@ export default function App() {
     catch { setNotice('تعذّر حفظ السجل على هذا الجهاز؛ قد تكون مساحة التخزين ممتلئة.'); }
   }, [savedDrafts]);
   const remaining = 1200 - details.length;
+  const qualityChecks = useMemo(() => {
+    const checks = [
+      { label: 'اسم المنتج واضح ومحدد', done: clean(name).length >= 5, points: 10, tip: 'اكتب اسماً يوضح نوع المنتج واستخدامه.' },
+      { label: 'إضافة مواصفات أساسية', done: clean(details).length >= 20, points: 10, tip: 'أضف المواصفات الأساسية مثل الخامة والمقاس والميزات.' },
+      { label: 'تحديد تصنيف المنتج', done: !!clean(productInfo.category), points: 10, tip: 'حدد الفئة المناسبة لتسهيل فهم المنتج.' },
+      { label: 'إدخال العلامة التجارية', done: !!clean(productInfo.brand), points: 5, tip: 'أدخل العلامة التجارية إن كانت موجودة.' },
+      { label: 'توضيح الخامة والمواد', done: !!clean(productInfo.material), points: 10, tip: 'اذكر الخامة بدقة وتجنب التخمين.' },
+      { label: 'إضافة المقاس أو الأبعاد', done: !!clean(productInfo.dimensions), points: 10, tip: 'أدخل المقاسات أو الوزن أو السعة حسب نوع المنتج.' },
+      { label: 'تحديد اللون أو النمط', done: !!clean(productInfo.color), points: 5, tip: 'حدد اللون أو النمط الفعلي للمنتج.' },
+      { label: 'تحديد الفئة المستهدفة', done: !!clean(productInfo.audience), points: 5, tip: 'وضح لمن صُمم المنتج عند الحاجة.' },
+      { label: 'شرح الاستخدام والفائدة', done: !!clean(productInfo.usage), points: 10, tip: 'اشرح الاستخدام والفائدة الواقعية للعميل.' },
+      { label: 'توضيح محتويات العبوة', done: !!clean(productInfo.packageContents), points: 5, tip: 'اذكر عدد القطع والملحقات المرفقة.' },
+      { label: 'إضافة تعليمات العناية', done: !!clean(productInfo.care), points: 5, tip: 'أضف طريقة التنظيف أو العناية إن توفرت.' },
+      { label: 'إدخال بلد المنشأ', done: !!clean(productInfo.origin), points: 5, tip: 'أدخل بلد المنشأ إذا كان مؤكداً.' },
+      { label: 'توضيح الضمان', done: !!clean(productInfo.warranty), points: 5, tip: 'أدخل تفاصيل الضمان أو اتركه فارغاً إذا لا يوجد.' },
+    ];
+    const score = checks.reduce((total, item) => total + (item.done ? item.points : 0), 0);
+    return { checks, score, missing: checks.filter(item => !item.done) };
+  }, [name, details, productInfo]);
 
   const fullText = useMemo(() => result ? [
     'عنوان المنتج', result.title, '', 'الوصف', result.description, '', 'المميزات',
@@ -236,6 +255,21 @@ export default function App() {
             <label htmlFor={`info-${field.key}`}>{field.label}</label>
             <input id={`info-${field.key}`} value={productInfo[field.key]} onChange={e => setProductInfo(current => ({ ...current, [field.key]: e.target.value }))} placeholder={field.placeholder} />
           </div>)}
+        </div>
+        <div className="quality-panel" aria-live="polite">
+          <div className="quality-top">
+            <div><strong>مؤشر اكتمال بيانات المنتج</strong><small>يساعدك على اكتشاف المعلومات الناقصة قبل النشر</small></div>
+            <span className={qualityChecks.score >= 80 ? 'quality-good' : qualityChecks.score >= 50 ? 'quality-mid' : 'quality-low'}>{qualityChecks.score}%</span>
+          </div>
+          <div className="quality-track"><span style={{ width: qualityChecks.score + '%' }} /></div>
+          <div className="quality-list">
+            {qualityChecks.checks.map(item => <div className={item.done ? 'quality-check done' : 'quality-check'} key={item.label}>
+              <span className="quality-mark">{item.done ? '✓' : '○'}</span><span>{item.label}</span><b>{item.points}</b>
+            </div>)}
+          </div>
+          {qualityChecks.missing.length > 0 && <p className="quality-tip">الخطوة التالية: {qualityChecks.missing[0].tip}</p>}
+          {qualityChecks.missing.length === 0 && <p className="quality-tip quality-complete">ممتاز! أدخلت جميع البيانات الأساسية المتاحة.</p>}
+          <small className="quality-disclaimer">هذا مؤشر اكتمال للبيانات وليس ضماناً لترتيب المنتج في نتائج البحث أو قبوله من المنصة.</small>
         </div>
         <label>منصة البيع</label>
         <div className="platforms">{platforms.map(p => <button type="button" key={p} aria-pressed={platform === p} className={platform === p ? 'active' : ''} onClick={() => { setPlatform(p); setResult(null); }}>{p}</button>)}</div>
