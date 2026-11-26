@@ -300,7 +300,7 @@ export default function App() {
           title: autoTitle, description: autoDescription,
           features: autoFeatures,
           keywords: autoKeywords,
-          titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string' && x.trim().length > 3 && !/سما$/i.test(x)) : []
+          titleAlternatives: Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(x => x.length > 3 && !/سما$/i.test(x)) : []
         });
       } else {
         setResult(null);
@@ -349,7 +349,7 @@ export default function App() {
       const responseDescription = typeof payload.description === 'string' ? payload.description.trim() : '';
       const responseFeatures = Array.isArray(payload.features) ? payload.features.filter((x): x is string => typeof x === 'string' && x.trim().length > 3).map(x => x.trim()) : [];
       const responseKeywords = Array.isArray(payload.keywords) ? payload.keywords.filter((x): x is string => typeof x === 'string' && x.trim().length > 1).map(x => x.trim()) : [];
-      const responseAlternatives = Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string' && x.trim().length > 3 && !/سما$/i.test(x)).map(x => x.trim()) : [];
+      const responseAlternatives = Array.isArray(payload.titleAlternatives) ? payload.titleAlternatives.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(x => x.length > 3 && !/سما$/i.test(x)) : [];
       if (!responseTitle || responseTitle.length < clean(name).length || /سما$/i.test(responseTitle) || (clean(name) && !responseTitle.startsWith(clean(name)))) {
         throw new Error('العنوان الذي أعاده الذكاء الاصطناعي غير مكتمل. لم نحفظ المسودة؛ أعد المحاولة.');
       }
