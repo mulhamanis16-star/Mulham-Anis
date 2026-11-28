@@ -198,7 +198,7 @@ export default function App() {
     const earnedPoints = checks.reduce((total, item) => total + (item.done ? item.points : 0), 0);
     const maximumPoints = checks.reduce((total, item) => total + item.points, 0);
     const score = maximumPoints ? Math.round((earnedPoints / maximumPoints) * 100) : 0;
-    return { checks, score, missing: checks.filter(item => !item.done) };
+    return { checks, score, earnedPoints, maximumPoints, missing: checks.filter(item => !item.done) };
   }, [name, details, productInfo]);
 
   const fullText = useMemo(() => result ? [
@@ -541,7 +541,7 @@ export default function App() {
         <div className="quality-panel" aria-live="polite">
           <div className="quality-top">
             <div><strong>مؤشر اكتمال بيانات المنتج</strong><small>يساعدك على اكتشاف المعلومات الناقصة قبل النشر</small></div>
-            <span className={qualityChecks.score >= 80 ? 'quality-good' : qualityChecks.score >= 50 ? 'quality-mid' : 'quality-low'}>{qualityChecks.score}%</span>
+            <span className={qualityChecks.score >= 80 ? 'quality-good' : qualityChecks.score >= 50 ? 'quality-mid' : 'quality-low'}>{qualityChecks.score}% <small>({qualityChecks.earnedPoints}/{qualityChecks.maximumPoints})</small></span>
           </div>
           <div className="quality-track"><span style={{ width: qualityChecks.score + '%' }} /></div>
           <div className="quality-list">
